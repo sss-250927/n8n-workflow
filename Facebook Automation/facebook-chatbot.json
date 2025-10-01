@@ -1,0 +1,511 @@
+{
+  "name": "Facebook Messenger AI Chatbot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "facebook-messenger-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "id": "af11f43b-5aa0-4d99-9d9e-334d6f0c0b46",
+      "name": "Facebook Webhook",
+      "webhookId": "647580a6-85b8-4991-9379-6f4ff146a5bd",
+      "notesInFlow": true,
+      "notes": "Receives incoming messages from Facebook Messenger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "facebook-messenger-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ],
+      "id": "webhook-verify-node",
+      "name": "Webhook Verify",
+      "webhookId": "647580a6-85b8-4991-9379-6f4ff146a5bd",
+      "notesInFlow": true,
+      "notes": "Handles Facebook webhook verification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "6220c287-f5b9-4354-b713-fb70753ec2a8",
+              "leftValue": "={{ $json.query['hub.mode'] }}",
+              "rightValue": "subscribe",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "9bd09109-c87d-496d-860d-39c2cd96d00c",
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "={{ $env.FACEBOOK_VERIFY_TOKEN }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        100
+      ],
+      "id": "3365ab13-ca26-4fc1-b21b-d5c8bbeb8539",
+      "name": "Verify Token",
+      "notesInFlow": true,
+      "notes": "Validates Facebook verification token"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/plain"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        100
+      ],
+      "id": "afb304ac-0290-4ad7-b6ee-1449625ac997",
+      "name": "Respond Challenge",
+      "notesInFlow": true,
+      "notes": "Returns challenge token to Facebook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "check-message-exists",
+              "leftValue": "={{ $json.body.entry?.[0]?.messaging?.[0]?.message?.text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        300
+      ],
+      "id": "validate-message-node",
+      "name": "Validate Message",
+      "notesInFlow": true,
+      "notes": "Checks if message contains text"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract message data with safe access\nconst entry = $input.item.json.body?.entry?.[0];\nconst messaging = entry?.messaging?.[0];\n\nif (!messaging || !messaging.message) {\n  return [];\n}\n\nconst messageData = {\n  senderId: messaging.sender?.id,\n  recipientId: messaging.recipient?.id,\n  messageText: messaging.message?.text || '',\n  timestamp: messaging.timestamp,\n  pageId: entry.id\n};\n\nreturn { json: messageData };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "id": "extract-data-node",
+      "name": "Extract Message Data",
+      "notesInFlow": true,
+      "notes": "Safely extracts message data from Facebook webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "user-message",
+              "name": "userMessage",
+              "value": "={{ $json.messageText }}",
+              "type": "string"
+            },
+            {
+              "id": "sender-id",
+              "name": "senderId",
+              "value": "={{ $json.senderId }}",
+              "type": "string"
+            },
+            {
+              "id": "recipient-id",
+              "name": "recipientId",
+              "value": "={{ $json.recipientId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        300
+      ],
+      "id": "set-variables-node",
+      "name": "Set Variables",
+      "notesInFlow": true,
+      "notes": "Prepares data for AI agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userMessage }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are a professional AI assistant for Expedite Formation, a company that helps businesses build intelligent chatbots for their Facebook pages and websites.\n\n**Your Role:**\n- Answer questions about chatbot services professionally and helpfully\n- Understand customer requirements for chatbot automation\n- Provide information about how chatbots can help their business\n- Be friendly, concise, and solution-oriented\n\n**Key Services:**\n- Facebook Messenger chatbot development\n- Automated customer support solutions\n- Lead generation and qualification bots\n- Integration with business systems (CRM, scheduling, etc.)\n- 24/7 automated responses\n\n**Guidelines:**\n- Keep responses clear and under 300 characters when possible\n- Ask clarifying questions to understand their needs\n- Suggest next steps or offer to connect with a specialist\n- Be empathetic and professional\n\nRemember: You're representing a technology service company, so maintain a professional yet approachable tone."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1120,
+        300
+      ],
+      "id": "cee3a984-5348-49dd-b845-6c1aa6819607",
+      "name": "AI Agent",
+      "notesInFlow": true,
+      "notes": "Processes message with AI and generates response"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 500
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        480
+      ],
+      "id": "b97f6306-d33b-4be7-8b65-16a147f12ec4",
+      "name": "OpenAI GPT-4o Mini",
+      "credentials": {
+        "openAiApi": {
+          "id": "1whV52OROhz8Px0o",
+          "name": "N8N CREDENTIALS"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Latest GPT-4o mini model for cost-effective responses"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.senderId }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        480
+      ],
+      "id": "b22694fe-7c48-4dc0-8d8e-8806962927f6",
+      "name": "Conversation Memory",
+      "notesInFlow": true,
+      "notes": "Maintains conversation context per user"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        580
+      ],
+      "id": "output-parser-node",
+      "name": "Output Parser",
+      "notesInFlow": true,
+      "notes": "Ensures clean AI responses"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.recipientId }}/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Set Variables').item.json.senderId }}\"\n  },\n  \"messaging_type\": \"RESPONSE\",\n  \"message\": {\n    \"text\": {{ JSON.stringify($json.output) }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        300
+      ],
+      "id": "38467004-20ba-4b73-8399-151eda6f82f5",
+      "name": "Send to Facebook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "facebook-token-cred",
+          "name": "Facebook Page Token"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Sends AI response back to user via Facebook API"
+    },
+    {
+      "parameters": {
+        "respondWith": "noData",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        300
+      ],
+      "id": "respond-success-node",
+      "name": "Respond Success",
+      "notesInFlow": true,
+      "notes": "Acknowledges receipt to Facebook"
+    },
+    {
+      "parameters": {
+        "respondWith": "noData",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        480
+      ],
+      "id": "respond-no-message-node",
+      "name": "Respond No Message",
+      "notesInFlow": true,
+      "notes": "Handles non-text messages gracefully"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error handler - logs error and returns graceful response\nconst error = $input.item.json.error || $input.item.json;\n\nconsole.error('Workflow error:', {\n  message: error.message,\n  stack: error.stack,\n  timestamp: new Date().toISOString()\n});\n\nreturn {\n  json: {\n    error: true,\n    message: 'An error occurred processing your message. Please try again.',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        120
+      ],
+      "id": "error-handler-node",
+      "name": "Error Handler",
+      "notesInFlow": true,
+      "notes": "Handles errors gracefully with logging"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Verify": {
+      "main": [
+        [
+          {
+            "node": "Verify Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Token": {
+      "main": [
+        [
+          {
+            "node": "Respond Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Message": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond No Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send to Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT-4o Mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Facebook": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "error-handler-node"
+  },
+  "versionId": "c7568661-d823-4b78-ae03-e10a3f872a44",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d37050be00c2d70c445ea8a429509bca5fcb473169de9af418604a382b81f48e"
+  },
+  "id": "F003LSYrSFz9dvPU",
+  "tags": [
+    {
+      "createdAt": "2025-10-01T00:00:00.000Z",
+      "updatedAt": "2025-10-01T00:00:00.000Z",
+      "id": "facebook-automation",
+      "name": "Facebook Automation"
+    },
+    {
+      "createdAt": "2025-10-01T00:00:00.000Z",
+      "updatedAt": "2025-10-01T00:00:00.000Z",
+      "id": "ai-chatbot",
+      "name": "AI Chatbot"
+    }
+  ]
+}
