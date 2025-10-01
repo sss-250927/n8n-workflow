@@ -485,8 +485,7 @@
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": "error-handler-node"
+    "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "c7568661-d823-4b78-ae03-e10a3f872a44",
   "meta": {
