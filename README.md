@@ -71,7 +71,35 @@ This repository serves as a comprehensive collection of **n8n workflows** design
 
 ## 📂 Workflows
 
-### Available Workflow Categories
+### Available Workflows
+
+#### 🤖 **Facebook Automation**
+- **[Facebook Messenger AI Chatbot](Facebook%20Automation/facebook-chatbot.json)** 
+  - AI-powered chatbot for Facebook Messenger
+  - Automated responses using GPT-4o-mini
+  - Handles GET/POST webhook requests
+  - Comprehensive error handling and validation
+  - [📖 Documentation](docs/facebook-messenger-ai-chatbot.md)
+
+#### 🎨 **Image Generation**
+- **[AI Product Advertisement Generator](Image/Nano%20🍌.json)**
+  - Convert product images to professional advertisements
+  - Powered by Google Gemini 2.0 Flash (Nano Banana)
+  - 5 customizable ad styles (Professional, Minimalist, Bold, Luxury, Eco-Friendly)
+  - Dynamic prompt building and MIME type detection
+  - [📖 Documentation](docs/ai-product-advertisement-generator.md)
+
+#### 🦷 **Healthcare & Appointments**
+- **[Tribeca Dental Care - AI Appointment System](AI%20Agent/Tribeca-Dental-Care-System-Refactored.json)**
+  - Comprehensive dental appointment booking system
+  - AI agents for availability checking and booking creation
+  - Automated email confirmations with professional design
+  - Slack team notifications and Google Sheets logging
+  - Google Calendar integration with conflict detection
+  - RESTful API with validation and error handling
+  - [📖 Documentation](docs/tribeca-dental-care-system.md)
+
+### Workflow Categories
 
 Workflows are organized into the following categories:
 
@@ -85,8 +113,10 @@ Workflows are organized into the following categories:
 - **🔄 Data Processing**: Transform, clean, and process data
 - **🌐 Web Scraping**: Extract data from websites
 - **🎫 Customer Support**: Automate support ticket handling
+- **🏥 Healthcare**: Appointment booking, patient management
+- **🎨 AI & Creative Tools**: AI-powered content generation and image processing
 
-> **Note**: As this is a growing collection, workflows will be added to the repository over time. Check back regularly for new additions!
+> **Note**: This is a growing collection! All workflows have been refactored to use the latest n8n versions with comprehensive documentation. Check back regularly for new additions!
 
 ---
 

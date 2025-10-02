@@ -1,0 +1,849 @@
+{
+  "name": "Tribeca Dental Care - AI Appointment System",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-availability",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        140,
+        -560
+      ],
+      "id": "fad81c2b-67e9-44e4-9c74-9c2f31435316",
+      "name": "Check Availability API",
+      "webhookId": "81725f5e-33bc-4c13-9df4-632b32c32626",
+      "notesInFlow": true,
+      "notes": "API endpoint to check if requested time slot is available"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "validate-date",
+              "leftValue": "={{ $json.body.requested_date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            },
+            {
+              "id": "validate-time",
+              "leftValue": "={{ $json.body.requested_time }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        340,
+        -560
+      ],
+      "id": "validate-availability-request",
+      "name": "Validate Request",
+      "notesInFlow": true,
+      "notes": "Ensures date and time are provided"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Check appointment availability for:\n\nRequested Date: {{ $json.body.requested_date }}\nRequested Time: {{ $json.body.requested_time }}\nDuration: 1 hour\n\nPlease check if this time slot is available in the calendar.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an intelligent appointment scheduling assistant for Tribeca Dental Care.\n\n**Your Task:**\nCheck if the requested 1-hour time slot is available in the Google Calendar.\n\n**Instructions:**\n1. Use the Google Calendar tool to fetch events for the requested date and time\n2. Check if there are any conflicting appointments within the requested time slot\n3. Consider a 1-hour duration for each appointment\n4. Return a clear, simple response\n\n**Response Format:**\nYou must respond with ONLY one of these exact phrases:\n- \"Available\" (if the time slot is completely free)\n- \"Not Available\" (if there's any conflict or booking)\n\n**Important:**\n- Be precise about time overlaps\n- Consider the full 1-hour duration\n- Do not add any extra explanation in your response"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        540,
+        -560
+      ],
+      "id": "45a85a37-6df3-464d-b454-c6d30064152a",
+      "name": "Availability Check Agent",
+      "notesInFlow": true,
+      "notes": "AI agent that checks calendar availability"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 500
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        540,
+        -384
+      ],
+      "id": "bb04dc46-2d86-4f55-a346-8e06942de6ff",
+      "name": "OpenAI GPT-4o Mini (Availability)",
+      "credentials": {
+        "openAiApi": {
+          "id": "tcD1kui7iDKjBprc",
+          "name": "OpenAi account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "AI model for availability checking (low temp for consistency)"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1.3,
+      "position": [
+        740,
+        -384
+      ],
+      "id": "output-parser-availability",
+      "name": "Output Parser (Availability)",
+      "notesInFlow": true,
+      "notes": "Ensures clean availability response"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "12712b7aba31856a75d127a01be4994372f5f10c5449c805f0d5d049789c9516@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "For the Agent"
+        },
+        "returnAll": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Return_All', `Return all events`, 'boolean') }}",
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', `Start time for search`, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', `End time for search`, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        740,
+        -208
+      ],
+      "id": "adb6062b-ef4a-4f4e-b1bc-6c0022abd5a2",
+      "name": "Google Calendar - Get Events",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "eSmoCuD9ohlISpYw",
+          "name": "Google Calendar account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Retrieves calendar events for availability checking"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format availability response\nconst aiOutput = $input.item.json.output || $input.item.json.text || '';\nconst isAvailable = aiOutput.toLowerCase().includes('available') && !aiOutput.toLowerCase().includes('not available');\n\nreturn [{\n  json: {\n    success: true,\n    available: isAvailable,\n    message: isAvailable ? 'Time slot is available' : 'Time slot is not available',\n    requested_date: $('Check Availability API').item.json.body.requested_date,\n    requested_time: $('Check Availability API').item.json.body.requested_time,\n    checked_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        -560
+      ],
+      "id": "format-availability-response",
+      "name": "Format Availability Response",
+      "notesInFlow": true,
+      "notes": "Formats AI response into structured JSON"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1140,
+        -560
+      ],
+      "id": "6f52f328-4b2f-4097-bbed-c49273ddd36e",
+      "name": "Return Availability Result",
+      "notesInFlow": true,
+      "notes": "Returns availability check result to caller"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Missing required fields: date and time\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        540,
+        -720
+      ],
+      "id": "error-response-availability",
+      "name": "Error Response (Availability)",
+      "notesInFlow": true,
+      "notes": "Returns error if validation fails"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-appointment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        140,
+        280
+      ],
+      "id": "28bbb41d-89a1-4cff-ac79-864616d126fc",
+      "name": "Book Appointment API",
+      "webhookId": "0b6171dc-61fb-4698-a845-533ee3496ad9",
+      "notesInFlow": true,
+      "notes": "API endpoint to create new appointment booking"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "validate-name",
+              "leftValue": "={{ $json.body.Name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            },
+            {
+              "id": "validate-email",
+              "leftValue": "={{ $json.body.Email_Address }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            },
+            {
+              "id": "validate-booking-time",
+              "leftValue": "={{ $json.body.Booking_Time }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            },
+            {
+              "id": "validate-service",
+              "leftValue": "={{ $json.body.Service_Type }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        340,
+        280
+      ],
+      "id": "validate-booking-request",
+      "name": "Validate Booking Data",
+      "notesInFlow": true,
+      "notes": "Ensures all required booking information is provided"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a new dental appointment with the following details:\n\n**Patient Information:**\n- Name: {{ $json.body.Name }}\n- Email: {{ $json.body.Email_Address }}\n- Phone: {{ $json.body.Phone_Number }}\n\n**Appointment Details:**\n- Service: {{ $json.body.Service_Type }}\n- Date & Time: {{ $json.body.Booking_Time }}\n- Duration: 1 hour\n\nPlease create this appointment in the calendar.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a professional appointment booking assistant for Tribeca Dental Care.\n\n**Your Task:**\nCreate a new appointment in Google Calendar with the provided patient and appointment details.\n\n**Instructions:**\n1. Use the Google Calendar tool to create a new event\n2. Set the duration to exactly 1 hour from the specified time\n3. Add the patient email as an attendee\n4. Use the service type for both the summary (title) and description\n5. Format the event professionally\n\n**Event Details to Set:**\n- **Summary:** [Service Type] - [Patient Name]\n- **Description:** Appointment for [Service Type]\\nPatient: [Name]\\nContact: [Phone] / [Email]\n- **Start Time:** As provided in Booking_Time\n- **End Time:** 1 hour after start time\n- **Attendees:** Patient email address\n\n**Important:**\n- Ensure the time format is correct\n- Don't send email notifications (set sendUpdates to 'none')\n- Create the event successfully before responding\n- Respond with \"Appointment created successfully\" when done"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        540,
+        280
+      ],
+      "id": "c496ea0d-6e7d-4c24-b4a7-8c5e5ed10aea",
+      "name": "Booking Creation Agent",
+      "notesInFlow": true,
+      "notes": "AI agent that creates calendar appointments"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.5,
+          "maxTokens": 800
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        540,
+        456
+      ],
+      "id": "74513802-c731-40dd-a6b8-984df5b3c61b",
+      "name": "OpenAI GPT-4o Mini (Booking)",
+      "credentials": {
+        "openAiApi": {
+          "id": "tcD1kui7iDKjBprc",
+          "name": "OpenAi account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "AI model for appointment creation"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1.3,
+      "position": [
+        740,
+        456
+      ],
+      "id": "output-parser-booking",
+      "name": "Output Parser (Booking)",
+      "notesInFlow": true,
+      "notes": "Ensures clean booking response"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "12712b7aba31856a75d127a01be4994372f5f10c5449c805f0d5d049789c9516@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "For the Agent"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', `Appointment start time in ISO format`, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', `Appointment end time in ISO format`, 'string') }}",
+        "useDefaultReminders": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Use_Default_Reminders', `Use default reminders`, 'boolean') }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('attendees0_Attendees', `Patient email address`, 'string') }}"
+          ],
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', `Appointment description with patient details`, 'string') }}",
+          "sendUpdates": "none",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', `Appointment title/summary`, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        740,
+        632
+      ],
+      "id": "d1c2cd3e-30be-49c4-841f-183c821e984b",
+      "name": "Google Calendar - Create Event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "eSmoCuD9ohlISpYw",
+          "name": "Google Calendar account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Creates new calendar event for appointment"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format booking details for email and notifications\nconst bookingData = $('Book Appointment API').item.json.body;\nconst bookingTime = new Date(bookingData.Booking_Time);\n\n// Format date: January 15, 2025\nconst formattedDate = bookingTime.toLocaleDateString('en-US', {\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\n\n// Format time: 2:00 PM\nconst formattedTime = bookingTime.toLocaleTimeString('en-US', {\n  hour: 'numeric',\n  minute: '2-digit',\n  hour12: true\n});\n\n// Calculate end time (1 hour later)\nconst endTime = new Date(bookingTime.getTime() + 60 * 60 * 1000);\nconst formattedEndTime = endTime.toLocaleTimeString('en-US', {\n  hour: 'numeric',\n  minute: '2-digit',\n  hour12: true\n});\n\nreturn [{\n  json: {\n    ...bookingData,\n    bookingDate: formattedDate,\n    bookingTime: formattedTime,\n    bookingEndTime: formattedEndTime,\n    bookingDateTime: `${formattedDate} at ${formattedTime}`,\n    bookingTimeRange: `${formattedTime} - ${formattedEndTime}`,\n    confirmedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        280
+      ],
+      "id": "78f515bb-b615-46aa-a971-c4a8413a6cc1",
+      "name": "Format Booking Details",
+      "notesInFlow": true,
+      "notes": "Formats date/time for human-readable notifications"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email_Address }}",
+        "subject": "=🦷 Your Tribeca Dental Care Appointment is Confirmed!",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Appointment Confirmation - Tribeca Dental Care</title>\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f5f5f5;\">\n    \n    <!-- Main Container -->\n    <div style=\"background-color: #ffffff; margin: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);\">\n        \n        <!-- Header with Brand Colors -->\n        <div style=\"background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); padding: 40px 20px; text-align: center;\">\n            <h1 style=\"color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;\">\n                🦷 Tribeca Dental Care\n            </h1>\n            <p style=\"color: #e0e7ef; margin: 10px 0 0 0; font-size: 16px;\">Your Smile, Our Mission</p>\n        </div>\n        \n        <!-- Success Badge -->\n        <div style=\"background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 0;\">\n            <p style=\"margin: 0; color: #155724; font-size: 18px; font-weight: 600;\">\n                ✅ Appointment Successfully Confirmed!\n            </p>\n        </div>\n        \n        <!-- Content -->\n        <div style=\"padding: 30px;\">\n            <p style=\"font-size: 16px; color: #333; margin: 0 0 20px 0;\">\n                Dear <strong>{{ $json.Name }}</strong>,\n            </p>\n            <p style=\"font-size: 15px; color: #555; margin: 0 0 30px 0;\">\n                Thank you for choosing Tribeca Dental Care! Your appointment has been scheduled and we're looking forward to seeing you.\n            </p>\n            \n            <!-- Appointment Details Card -->\n            <div style=\"background: linear-gradient(to right, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; padding: 25px; margin: 0 0 30px 0;\">\n                <h2 style=\"margin: 0 0 20px 0; color: #2c5aa0; font-size: 20px; border-bottom: 2px solid #2c5aa0; padding-bottom: 10px;\">\n                    📅 Appointment Details\n                </h2>\n                \n                <table style=\"width: 100%; border-collapse: collapse;\">\n                    <tr>\n                        <td style=\"padding: 10px 0; color: #666; font-size: 14px; width: 120px;\">\n                            <strong>📆 Date:</strong>\n                        </td>\n                        <td style=\"padding: 10px 0; color: #333; font-size: 15px; font-weight: 500;\">\n                            {{ $json.bookingDate }}\n                        </td>\n                    </tr>\n                    <tr>\n                        <td style=\"padding: 10px 0; color: #666; font-size: 14px;\">\n                            <strong>⏰ Time:</strong>\n                        </td>\n                        <td style=\"padding: 10px 0; color: #333; font-size: 15px; font-weight: 500;\">\n                            {{ $json.bookingTimeRange }}\n                        </td>\n                    </tr>\n                    <tr>\n                        <td style=\"padding: 10px 0; color: #666; font-size: 14px;\">\n                            <strong>👨‍⚕️ Provider:</strong>\n                        </td>\n                        <td style=\"padding: 10px 0; color: #333; font-size: 15px; font-weight: 500;\">\n                            Dr. Tribeca\n                        </td>\n                    </tr>\n                    <tr>\n                        <td style=\"padding: 10px 0; color: #666; font-size: 14px;\">\n                            <strong>🦷 Service:</strong>\n                        </td>\n                        <td style=\"padding: 10px 0; color: #333; font-size: 15px; font-weight: 500;\">\n                            {{ $json.Service_Type }}\n                        </td>\n                    </tr>\n                    <tr>\n                        <td style=\"padding: 10px 0; color: #666; font-size: 14px;\">\n                            <strong>📍 Location:</strong>\n                        </td>\n                        <td style=\"padding: 10px 0; color: #333; font-size: 15px; font-weight: 500;\">\n                            123 Tribeca Street<br>New York, NY 10013\n                        </td>\n                    </tr>\n                </table>\n            </div>\n            \n            <!-- Call to Action -->\n            <div style=\"text-align: center; margin: 30px 0;\">\n                <a href=\"tel:+12345678900\" style=\"display: inline-block; background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(44, 90, 160, 0.3);\">\n                    📞 Call Us: (123) 456-7890\n                </a>\n            </div>\n            \n            <!-- Important Reminders -->\n            <div style=\"background-color: #fff8e1; border-left: 4px solid #ffa000; border-radius: 8px; padding: 20px; margin: 30px 0 0 0;\">\n                <h3 style=\"margin: 0 0 15px 0; color: #f57c00; font-size: 18px;\">\n                    ⚠️ Important Reminders\n                </h3>\n                <ul style=\"margin: 0; padding-left: 20px; color: #555; font-size: 14px;\">\n                    <li style=\"margin-bottom: 8px;\">Please arrive <strong>15 minutes early</strong> to complete any necessary paperwork</li>\n                    <li style=\"margin-bottom: 8px;\">Bring a valid <strong>photo ID</strong> and your <strong>insurance card</strong> (if applicable)</li>\n                    <li style=\"margin-bottom: 8px;\">If you need to <strong>reschedule or cancel</strong>, please call us at least <strong>24 hours</strong> in advance</li>\n                    <li style=\"margin-bottom: 0;\">For emergency situations, call us immediately at <strong>(123) 456-7890</strong></li>\n                </ul>\n            </div>\n        </div>\n        \n        <!-- Footer -->\n        <div style=\"background-color: #f8f9fa; border-top: 1px solid #dee2e6; padding: 30px; text-align: center;\">\n            <div style=\"margin-bottom: 20px;\">\n                <h3 style=\"color: #2c5aa0; margin: 0 0 10px 0; font-size: 18px;\">Tribeca Dental Care</h3>\n                <p style=\"margin: 5px 0; color: #666; font-size: 14px;\">\n                    📍 123 Tribeca Street, New York, NY 10013\n                </p>\n                <p style=\"margin: 5px 0; color: #666; font-size: 14px;\">\n                    📞 Phone: (123) 456-7890 | ✉️ Email: info@tribecadentalcare.com\n                </p>\n            </div>\n            \n            <p style=\"font-size: 12px; color: #999; margin: 20px 0 0 0; line-height: 1.5;\">\n                This is an automated confirmation email. Please do not reply to this message.<br>\n                If you have questions, please contact us directly at the phone number above.\n            </p>\n        </div>\n        \n    </div>\n    \n    <!-- Footer Note -->\n    <div style=\"text-align: center; padding: 20px; color: #999; font-size: 12px;\">\n        <p style=\"margin: 0;\">© {{ new Date().getFullYear() }} Tribeca Dental Care. All rights reserved.</p>\n    </div>\n    \n</body>\n</html>",
+        "options": {
+          "appendAttribution": false,
+          "ccList": "",
+          "bccList": ""
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1140,
+        280
+      ],
+      "id": "50189c73-ee1d-4365-8e07-849555a15ab2",
+      "name": "Send Confirmation Email",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nsIx9uti5pvBIK1Q",
+          "name": "Gmail account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Sends professional appointment confirmation to patient"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C099PRAFVNK",
+          "mode": "list",
+          "cachedResultName": "new_client_info"
+        },
+        "text": "=:calendar: *New Appointment Booked!*\n\n:bust_in_silhouette: *Patient:* {{ $json.Name }}\n:phone: *Phone:* {{ $json.Phone_Number }}\n:email: *Email:* {{ $json.Email_Address }}\n\n:tooth: *Service:* {{ $json.Service_Type }}\n:clock3: *Appointment:* {{ $json.bookingDateTime }}\n:hourglass: *Duration:* {{ $json.bookingTimeRange }}\n\n:white_check_mark: *Status:* Confirmed\n:email: *Confirmation Sent:* Yes\n\n---\n_Booked at {{ $json.confirmedAt.toDateTime().toFormat('h:mm a') }}_",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1340,
+        280
+      ],
+      "id": "256631ec-e76d-4e04-9423-ec09c5aed697",
+      "name": "Notify Team (Slack)",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "oUYr6m1RcidO2Kgh",
+          "name": "Slack account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Sends notification to team Slack channel"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1METFLk3ZTnjNWY7a09CDRsTJVcEKarslWJ5vIvnI694",
+          "mode": "list",
+          "cachedResultName": "Tribeca Dental Care Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1METFLk3ZTnjNWY7a09CDRsTJVcEKarslWJ5vIvnI694/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1METFLk3ZTnjNWY7a09CDRsTJVcEKarslWJ5vIvnI694/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Patient Name": "={{ $json.Name }}",
+            "Phone Number": "={{ $json.Phone_Number }}",
+            "Email Address": "={{ $json.Email_Address }}",
+            "Service Type": "={{ $json.Service_Type }}",
+            "Appointment Date": "={{ $json.bookingDate }}",
+            "Appointment Time": "={{ $json.bookingTime }}",
+            "Time Range": "={{ $json.bookingTimeRange }}",
+            "Status": "Confirmed",
+            "Email Sent": "✅ Yes",
+            "Slack Notified": "✅ Yes",
+            "Confirmed At": "={{ $json.confirmedAt }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        1540,
+        280
+      ],
+      "id": "8e04865e-b84e-4fcc-9367-abda58f63c58",
+      "name": "Log to Spreadsheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Ja9l041N41e8rfxC",
+          "name": "Google Sheets account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Records appointment details in Google Sheets for tracking"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Appointment booked successfully\", \"appointment\": { \"patient\": $json.Name, \"service\": $json.Service_Type, \"date\": $json.bookingDate, \"time\": $json.bookingTime } } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1740,
+        280
+      ],
+      "id": "success-response-booking",
+      "name": "Return Success Response",
+      "notesInFlow": true,
+      "notes": "Returns booking confirmation to API caller"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Missing required booking information\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        540,
+        120
+      ],
+      "id": "error-response-booking",
+      "name": "Error Response (Booking)",
+      "notesInFlow": true,
+      "notes": "Returns error if booking validation fails"
+    },
+    {
+      "parameters": {
+        "content": "# 🔍 Availability Check Flow\n\n**Purpose:** Check if requested time slot is available\n\n**API Endpoint:** POST /check-availability\n\n**Request Body:**\n```json\n{\n  \"requested_date\": \"2025-01-15\",\n  \"requested_time\": \"14:00\"\n}\n```\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"available\": true,\n  \"message\": \"Time slot is available\"\n}\n```\n\n**Flow:**\n1. Receive availability request\n2. Validate date & time provided\n3. AI agent checks Google Calendar\n4. Return availability status",
+        "height": 560,
+        "width": 440,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        -800
+      ],
+      "id": "29d31848-5450-4c69-a376-df9ff940c978",
+      "name": "Availability Check Info"
+    },
+    {
+      "parameters": {
+        "content": "# 📅 Appointment Booking Flow\n\n**Purpose:** Create new dental appointment\n\n**API Endpoint:** POST /book-appointment\n\n**Request Body:**\n```json\n{\n  \"Name\": \"John Doe\",\n  \"Email_Address\": \"john@example.com\",\n  \"Phone_Number\": \"555-1234\",\n  \"Service_Type\": \"Cleaning\",\n  \"Booking_Time\": \"2025-01-15T14:00:00Z\"\n}\n```\n\n**Automated Actions:**\n1. ✅ Create calendar event\n2. 📧 Send confirmation email\n3. 💬 Notify team on Slack\n4. 📊 Log to Google Sheets\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Appointment booked successfully\"\n}\n```",
+        "height": 720,
+        "width": 440,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        40
+      ],
+      "id": "dfc76f25-32b1-4e66-912a-781444b0103c",
+      "name": "Booking Flow Info"
+    },
+    {
+      "parameters": {
+        "content": "# 🦷 Tribeca Dental Care\n## AI-Powered Appointment System\n\n**Features:**\n- 🤖 AI agents for intelligent scheduling\n- 📅 Google Calendar integration\n- 📧 Automated email confirmations\n- 💬 Slack team notifications\n- 📊 Appointment tracking in Sheets\n- ✅ Input validation & error handling\n- 🔄 RESTful API endpoints\n\n**Technology Stack:**\n- OpenAI GPT-4o Mini\n- Google Calendar API\n- Gmail API\n- Slack API\n- Google Sheets API\n\n**Version:** 2.0 (Refactored & Optimized)",
+        "height": 520,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -540,
+        -800
+      ],
+      "id": "workflow-overview",
+      "name": "Workflow Overview"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Check Availability API": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Availability Check Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response (Availability)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Availability Check Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Availability Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT-4o Mini (Availability)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Availability Check Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Parser (Availability)": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Availability Check Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar - Get Events": {
+      "ai_tool": [
+        [
+          {
+            "node": "Availability Check Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Availability Response": {
+      "main": [
+        [
+          {
+            "node": "Return Availability Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Appointment API": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Booking Data": {
+      "main": [
+        [
+          {
+            "node": "Booking Creation Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response (Booking)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Creation Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Booking Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT-4o Mini (Booking)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Booking Creation Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Parser (Booking)": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Booking Creation Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar - Create Event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Booking Creation Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Booking Details": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Notify Team (Slack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Team (Slack)": {
+      "main": [
+        [
+          {
+            "node": "Log to Spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Spreadsheet": {
+      "main": [
+        [
+          {
+            "node": "Return Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 300,
+    "timezone": "America/New_York"
+  },
+  "versionId": "911a7d4a-67ac-4f0e-a60e-dd180ec7c3d6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c4f1db98ecd74178a70f7f17c9b35261941324e33fdfcec8910ff8cb10d8482d"
+  },
+  "id": "CWaV3ytUKHgVgW5U",
+  "tags": [
+    {
+      "createdAt": "2025-10-02T00:00:00.000Z",
+      "updatedAt": "2025-10-02T00:00:00.000Z",
+      "id": "dental-care",
+      "name": "Dental Care"
+    },
+    {
+      "createdAt": "2025-10-02T00:00:00.000Z",
+      "updatedAt": "2025-10-02T00:00:00.000Z",
+      "id": "ai-agent",
+      "name": "AI Agent"
+    },
+    {
+      "createdAt": "2025-10-02T00:00:00.000Z",
+      "updatedAt": "2025-10-02T00:00:00.000Z",
+      "id": "appointment-booking",
+      "name": "Appointment Booking"
+    },
+    {
+      "createdAt": "2025-10-02T00:00:00.000Z",
+      "updatedAt": "2025-10-02T00:00:00.000Z",
+      "id": "healthcare",
+      "name": "Healthcare"
+    }
+  ]
+}
