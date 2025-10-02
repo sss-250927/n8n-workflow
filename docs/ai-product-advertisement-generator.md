@@ -708,7 +708,7 @@ Need help with this workflow?
 
 ## 📝 Changelog
 
-### Version 2.0 (Optimized - October 2025)
+### Version 2.0 (Optimized - Planned)
 - ✅ Updated to Google Gemini 2.0 Flash (latest model)
 - ✅ Added validation and error handling
 - ✅ Implemented dynamic prompt building
