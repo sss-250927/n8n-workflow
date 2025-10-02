@@ -126,7 +126,7 @@
         "operation": "getAll",
         "calendar": {
           "__rl": true,
-          "value": "12712b7aba31856a75d127a01be4994372f5f10c5449c805f0d5d049789c9516@group.calendar.google.com",
+          "value": "YOUR_CALENDAR_ID@group.calendar.google.com", // Replace with your own calendar ID
           "mode": "list",
           "cachedResultName": "For the Agent"
         },
