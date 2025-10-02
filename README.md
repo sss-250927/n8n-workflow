@@ -99,6 +99,17 @@ This repository serves as a comprehensive collection of **n8n workflows** design
   - RESTful API with validation and error handling
   - [📖 Documentation](docs/tribeca-dental-care-system.md)
 
+#### 📰 **Web Scraping & Data Collection**
+- **[Bangla News Scraper & AI Summarizer](Scrapper/latest-bangla-news-scraper.json)**
+  - Automated Bangla news scraping from multiple sources
+  - AI-powered summarization in both Bangla and English
+  - Sentiment analysis and topic extraction
+  - Duplicate detection with similarity matching
+  - Google Sheets integration for organized storage
+  - Scrapes Prothom Alo and Kaler Kantho every 2 hours
+  - Comprehensive data validation and error handling
+  - [📖 Documentation](docs/bangla-news-scraper.md)
+
 ### Workflow Categories
 
 Workflows are organized into the following categories:
@@ -111,10 +122,11 @@ Workflows are organized into the following categories:
 - **🔔 Notifications & Alerts**: Stay informed with automated notifications
 - **📈 Analytics & Reporting**: Generate and distribute reports automatically
 - **🔄 Data Processing**: Transform, clean, and process data
-- **🌐 Web Scraping**: Extract data from websites
+- **🌐 Web Scraping**: Extract and analyze data from websites
 - **🎫 Customer Support**: Automate support ticket handling
 - **🏥 Healthcare**: Appointment booking, patient management
 - **🎨 AI & Creative Tools**: AI-powered content generation and image processing
+- **📰 News & Media**: News aggregation, summarization, and analysis
 
 > **Note**: This is a growing collection! All workflows have been refactored to use the latest n8n versions with comprehensive documentation. Check back regularly for new additions!
 
