@@ -437,7 +437,7 @@
         "select": "channel",
         "channelId": {
           "__rl": true,
-          "value": "C099PRAFVNK",
+          "value": "YOUR_CHANNEL_ID",
           "mode": "list",
           "cachedResultName": "new_client_info"
         },
