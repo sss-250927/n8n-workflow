@@ -26,7 +26,9 @@
 
 ## 🎯 Overview
 
-The **Bangla News Scraper & AI Summarizer** is a fully automated n8n workflow that collects the latest news articles from popular Bangla news websites, uses AI to generate bilingual summaries (Bangla and English), analyzes sentiment, extracts key topics, and stores everything in Google Sheets for easy access and analysis.
+The **Bangla News Scraper & AI Summarizer** is a fully automated n8n workflow that collects the latest news articles from multiple Bangla and English news websites, uses AI to generate bilingual summaries (Bangla and English), analyzes sentiment, extracts key topics, and stores everything in Google Sheets for easy access and analysis.
+
+**✨ NEW in v3.0:** Dynamic multi-source architecture! Easily add unlimited news sources by editing a single configuration node - no need to add new nodes for each source.
 
 ### What This Workflow Does
 
@@ -45,7 +47,8 @@ The **Bangla News Scraper & AI Summarizer** is a fully automated n8n workflow th
 ### Core Features
 
 - **🔄 Automated Scraping** - Runs every 2 hours automatically
-- **🌐 Multi-Source** - Scrapes from multiple Bangla news websites
+- **🌐 Dynamic Multi-Source** - Easy configuration-based source management
+- **➕ Unlimited Sources** - Add new sources without adding nodes
 - **🤖 AI-Powered** - Uses OpenAI GPT-4o Mini for intelligent processing
 - **🇧🇩 Bangla Support** - Full Unicode Bangla character support
 - **🌍 Bilingual Summaries** - Summaries in both Bangla and English
@@ -71,62 +74,69 @@ The **Bangla News Scraper & AI Summarizer** is a fully automated n8n workflow th
 
 ## 🏗️ Workflow Architecture
 
-### Processing Pipeline (17 Nodes)
+### Processing Pipeline (12 Nodes) - v3.0 Dynamic
 
 ```
-Schedule Trigger (Every 2 hours)
-         ↓
-    ┌────┴────┐
-    ↓         ↓
-Fetch HTML  Fetch HTML
-(Source 1)  (Source 2)
-    ↓         ↓
-Parse HTML  Parse HTML
-    ↓         ↓
-    └────┬────┘
-         ↓
-    Merge Articles
-         ↓
-    Validate Data
-         ↓
-  Remove Duplicates
-         ↓
-   AI Summarization
-         ↓
-   Format Data
-         ↓
-  Save to Sheets
-         ↓
-  Generate Stats
+ Schedule Trigger (Every 2 hours)
+          ↓
+ Configure News Sources (6 default sources)
+          ↓
+     Fetch HTML (Dynamic - loops through all sources)
+          ↓
+ Parse Articles (Universal parser for any source)
+          ↓
+    Merge All Sources
+          ↓
+   Validate Articles
+          ↓
+  Remove Duplicates (URL + similarity)
+          ↓
+ AI News Summarizer (Multilingual)
+          ↓
+   Format Final Data
+          ↓
+  Save to Google Sheets (18 columns)
+          ↓
+  Generate Statistics
 ```
 
 ### Node Details
 
-**Scraping Phase (5 nodes):**
-1. **Schedule Trigger** - Runs every 2 hours
-2. **Fetch Prothom Alo** - HTTP request to fetch HTML
-3. **Fetch Kaler Kantho** - HTTP request to fetch HTML
-4. **Parse Prothom Alo Articles** - Extract article data with Cheerio
-5. **Parse Kaler Kantho Articles** - Extract article data with Cheerio
+**Configuration Phase (1 node):**
+1. **Configure News Sources** - ⚙️ Central config with JavaScript array of sources
+   - Contains 6 default sources (expandable to unlimited)
+   - Each source has: name, URL, selectors, language, limits
+   - Edit this node to add/remove sources!
+
+**Scraping Phase (2 nodes):**
+2. **Fetch HTML** - Dynamic HTTP requests to each configured source
+3. **Parse Articles (Universal)** - Single parser that works with ANY source
+   - Uses selectors from configuration
+   - Automatic fallback strategy
+   - Bangla/English text detection
 
 **Data Processing Phase (3 nodes):**
-6. **Merge All Articles** - Combines articles from all sources
-7. **Validate Articles** - Ensures required fields and Bangla text
-8. **Remove Duplicates** - Similarity-based deduplication
+4. **Merge All Sources** - Combines articles from all configured sources
+5. **Validate Articles** - Ensures required fields exist
+6. **Remove Duplicates** - Advanced deduplication:
+   - Exact URL matching
+   - Title similarity (Levenshtein distance)
+   - 85% similarity threshold
 
 **AI Processing Phase (4 nodes):**
-9. **AI News Summarizer** - LangChain AI agent
-10. **OpenAI GPT-4o Mini** - Language model
-11. **Structured Output Parser** - JSON schema validation
-12. **Format Final Data** - Combines all data
+7. **AI News Summarizer** - LangChain AI agent with multilingual support
+8. **OpenAI GPT-4o Mini** - Language model (Bangla + English)
+9. **Structured Output Parser** - JSON schema validation
+10. **Format Final Data** - Combines scraped + AI data
 
 **Storage Phase (2 nodes):**
-13. **Save to Google Sheets** - Stores processed articles
-14. **Generate Summary Stats** - Creates execution summary
+11. **Save to Google Sheets** - Stores with 18 columns of metadata
+12. **Generate Statistics** - Creates comprehensive execution summary
 
-**Documentation Nodes (4 sticky notes):**
+**Documentation Nodes (5 sticky notes):**
 - Workflow Overview
-- Scraping Info
+- Configuration Info
+- Parser Info  
 - AI Processing Info
 - Storage Info
 
@@ -134,11 +144,11 @@ Parse HTML  Parse HTML
 
 ## 🌐 News Sources
 
-### Currently Supported
+### Default Sources (6 Configured)
 
 #### 1. Prothom Alo (প্রথম আলো)
 - **URL:** https://www.prothomalo.com/
-- **Description:** One of Bangladesh's leading daily newspapers
+- **Description:** Bangladesh's leading daily newspaper
 - **Language:** Bangla
 - **Coverage:** National news, politics, sports, entertainment, international
 
@@ -147,6 +157,34 @@ Parse HTML  Parse HTML
 - **Description:** Popular Bangla daily newspaper
 - **Language:** Bangla
 - **Coverage:** National news, culture, sports, lifestyle
+
+#### 3. The Daily Star
+- **URL:** https://www.thedailystar.net/
+- **Description:** Leading English-language newspaper in Bangladesh
+- **Language:** English
+- **Coverage:** National news, business, opinion, world news
+
+#### 4. Jugantor (যুগান্তর)
+- **URL:** https://www.jugantor.com/
+- **Description:** Widely circulated Bangla newspaper
+- **Language:** Bangla
+- **Coverage:** News, politics, sports, entertainment
+
+#### 5. Samakal (সমকাল)
+- **URL:** https://samakal.com/
+- **Description:** Popular daily Bangla newspaper
+- **Language:** Bangla
+- **Coverage:** National news, culture, features
+
+#### 6. Bangladesh Pratidin (বাংলাদেশ প্রতিদিন)
+- **URL:** https://www.bd-pratidin.com/
+- **Description:** High-circulation Bangla daily
+- **Language:** Bangla
+- **Coverage:** National news, politics, lifestyle
+
+### 🎯 Easy to Add More!
+
+The workflow uses a **configuration-based architecture** - you can add unlimited sources by simply editing the "Configure News Sources" node. No need to create new HTTP or parser nodes!
 
 ### Extraction Strategy
 
@@ -197,7 +235,7 @@ Each source uses:
 1. Create a new Google Sheet named "Bangla News Archive"
 2. Add these column headers in the first row:
    ```
-   Date | Time | Source | Category | Title (Bangla) | Bangla Summary | English Summary | Key Topics | Sentiment | Main Theme | Article Link | Image URL | Scraped At | Processed At
+   Date | Time | Weekday | Source | Source (Bangla) | Language | Category | Title | Original Summary | English Summary | Key Topics | Sentiment | Main Theme | Article Link | Image URL | Scraped At | Processed At | Processing Time (sec)
    ```
 
 #### Connect n8n
@@ -263,19 +301,28 @@ Each source uses:
 
 ### Article Limits
 
-**Default:** 10 articles per source (20 total)
+**Default:** 10 articles per source × 6 sources = ~60 articles total
 
-**To Change Limit:**
+**To Change Limit for All Sources:**
 
 ```javascript
-// In Parse nodes (both Prothom Alo and Kaler Kantho)
-const maxArticles = 10;  // ← Change this value
+// In Configure News Sources node
+{
+  name: 'Source Name',
+  // ... other fields ...
+  maxArticles: 15,  // ← Change this value
+  enabled: true
+}
 ```
 
+**To Change Limit for Specific Source:**
+
+Just update the `maxArticles` value for that source in the configuration array.
+
 **Recommendations:**
-- Small scale: 5-10 articles
-- Medium scale: 10-20 articles
-- Large scale: 20-50 articles
+- Small scale: 5-10 articles per source
+- Medium scale: 10-15 articles per source
+- Large scale: 15-25 articles per source
 - Note: More articles = longer processing time + higher OpenAI costs
 
 ### AI Model Settings
@@ -405,9 +452,9 @@ Output Format (JSON):
 - Output tokens: ~200-400 (summary)
 - Cost: ~$0.001-0.002 per article
 
-**Per Run (20 articles):**
-- Total cost: ~$0.02-0.04
-- Monthly cost (12 runs/day): ~$7-15
+**Per Run (60 articles with 6 sources):**
+- Total cost: ~$0.06-0.12
+- Monthly cost (12 runs/day): ~$22-45
 
 **Optimization Tips:**
 - Use GPT-4o Mini (cheapest)
@@ -421,24 +468,28 @@ Output Format (JSON):
 
 ### Google Sheets Structure
 
-**14 Columns:**
+**18 Columns:**
 
 | Column | Description | Example |
-|--------|-------------|---------|
+|--------|-------------|---------|  
 | **Date** | Formatted date | October 2, 2025 |
 | **Time** | Formatted time | 02:30 PM |
-| **Source** | News source name | Prothom Alo |
+| **Weekday** | Day of week | Thursday |
+| **Source** | News source (English) | Prothom Alo |
+| **Source (Bangla)** | Source in Bangla | প্রথম আলো |
+| **Language** | Article language | Bangla |
 | **Category** | Article category | রাজনীতি (Politics) |
-| **Title (Bangla)** | Original title | প্রধানমন্ত্রীর ভাষণ |
-| **Bangla Summary** | AI-generated summary | সংক্ষিপ্ত সারাংশ... |
+| **Title** | Original headline | প্রধানমন্ত্রীর ভাষণ |
+| **Original Summary** | AI summary (original language) | সংক্ষিপ্ত সারাংশ... |
 | **English Summary** | Translated summary | Brief summary... |
 | **Key Topics** | Comma-separated topics | politics, speech, government |
 | **Sentiment** | Article sentiment | Positive |
 | **Main Theme** | Main theme | Political address |
 | **Article Link** | Full URL | https://... |
-| **Image URL** | Featured image URL | https://... |
-| **Scraped At** | ISO timestamp (scraping) | 2025-10-02T14:30:00Z |
-| **Processed At** | ISO timestamp (processing) | 2025-10-02T14:32:15Z |
+| **Image URL** | Featured image | https://... |
+| **Scraped At** | Scraping timestamp | 2025-10-02T14:30:00Z |
+| **Processed At** | Processing timestamp | 2025-10-02T14:32:15Z |
+| **Processing Time (sec)** | Time to process | 2.35 |
 
 ### Sample Row
 
@@ -526,9 +577,260 @@ Store in PostgreSQL or MongoDB:
 
 ## ➕ Adding New Sources
 
-### Step-by-Step Guide
+### ✨ New Dynamic Method (v3.0) - RECOMMENDED
 
-#### 1. Add HTTP Request Node
+With the new configuration-based architecture, adding sources is incredibly easy!
+
+#### Step-by-Step Guide
+
+**1. Open the Configuration Node**
+- Click on the **"Configure News Sources"** node
+- You'll see a JavaScript code editor with a `newsSources` array
+
+**2. Copy the Source Template**
+
+Scroll to the bottom of the code and you'll find this template:
+
+```javascript
+// ============================================
+// 📝 TO ADD A NEW SOURCE:
+// ============================================
+// 1. Copy the template below
+// 2. Update all fields with your source info
+// 3. Set enabled: true
+// 4. Save and test!
+//
+// {
+//   name: 'Source Name',
+//   nameInBangla: 'বাংলা নাম',
+//   url: 'https://example.com/',
+//   language: 'Bangla', // or 'English'
+//   selectors: {
+//     article: 'article, .news-card',  // Container for each article
+//     title: 'h2, .headline',          // Title element
+//     link: 'a',                       // Link element
+//     description: 'p, .excerpt',      // Description element
+//     image: 'img',                    // Image element
+//     category: '.category'            // Category element
+//   },
+//   maxArticles: 10,
+//   enabled: true
+// },
+```
+
+**3. Customize Your Source**
+
+Example - Adding BBC Bangla:
+
+```javascript
+const newsSources = [
+  // ... existing sources ...
+  
+  // Add your new source here:
+  {
+    name: 'BBC Bangla',
+    nameInBangla: 'বিবিসি বাংলা',
+    url: 'https://www.bbc.com/bengali',
+    language: 'Bangla',
+    selectors: {
+      article: 'article',
+      title: 'h3',
+      link: 'a',
+      description: 'p',
+      image: 'img',
+      category: '.category'
+    },
+    maxArticles: 10,
+    enabled: true
+  }
+];
+```
+
+**4. Find the Right Selectors**
+
+a) **Open the News Website:**
+   - Go to the homepage in your browser
+   - Find a news article
+
+b) **Inspect the HTML:**
+   - Right-click on the article → "Inspect" or "Inspect Element"
+   - Chrome DevTools or Firefox Developer Tools will open
+
+c) **Identify the Selectors:**
+
+```html
+<!-- Example HTML structure -->
+<article class="news-item">
+  <h2 class="headline">Article Title</h2>
+  <a href="/article/123">Read more</a>
+  <p class="excerpt">Article description...</p>
+  <img src="image.jpg" />
+  <span class="category">Politics</span>
+</article>
+```
+
+**Your selectors would be:**
+```javascript
+selectors: {
+  article: 'article, .news-item',    // Container (use comma for multiple options)
+  title: 'h2, .headline',            // Title element
+  link: 'a',                         // Link (usually just 'a')
+  description: 'p, .excerpt',        // Description
+  image: 'img',                      // Image (usually just 'img')
+  category: '.category, .tag'        // Category
+}
+```
+
+**5. Test Your New Source**
+
+1. Save the node
+2. Click **"Execute Node"** on "Configure News Sources"
+3. You should see output for each enabled source
+4. Click **"Execute Workflow"** to test the full flow
+5. Check if articles are extracted correctly
+
+**6. Troubleshoot if Needed**
+
+If no articles are found:
+- Check console logs in the "Parse Articles (Universal)" node
+- Try more generic selectors: `article, div, section`
+- Use browser DevTools to verify selector matches
+- Enable fallback parsing (it's automatic!)
+
+### 🎯 Selector Tips
+
+**Be Flexible - Use Multiple Options:**
+```javascript
+article: 'article, .news-card, .post, .story-card, .news-item'
+```
+
+**Common Patterns:**
+```javascript
+// Semantic HTML5
+article: 'article'
+
+// Class-based
+article: '.news-item, .post-item, .article-card'
+
+// ID-based
+article: '#news-list article'
+
+// Attribute selectors
+article: '[data-type="article"]'
+
+// Descendant selectors
+article: '.news-section article'
+```
+
+**Finding the Right Selector:**
+1. Start generic: `article`
+2. If too many matches: Add specificity → `article.news-item`
+3. If no matches: Use classes → `.news-card, .post`
+4. Multiple options: `article, .news-card, .story`
+
+### 📋 Complete Example
+
+**Adding Dhaka Tribune:**
+
+```javascript
+const newsSources = [
+  // ... existing 6 sources ...
+  
+  {
+    name: 'Dhaka Tribune',
+    nameInBangla: 'ঢাকা ট্রিবিউন',
+    url: 'https://www.dhakatribune.com/',
+    language: 'English',
+    selectors: {
+      article: 'article, .article-card',
+      title: 'h2, h3, .article-title',
+      link: 'a',
+      description: 'p, .article-excerpt',
+      image: 'img',
+      category: '.category, .section-name'
+    },
+    maxArticles: 10,
+    enabled: true
+  }
+];
+```
+
+### ⚙️ Advanced Configuration
+
+**Disable a Source Temporarily:**
+```javascript
+{
+  name: 'Source Name',
+  // ... other fields ...
+  enabled: false  // ← Set to false to skip this source
+}
+```
+
+**Adjust Article Limits Per Source:**
+```javascript
+{
+  name: 'High Volume Source',
+  // ... other fields ...
+  maxArticles: 20  // ← Fetch more articles from this source
+}
+
+{
+  name: 'Low Volume Source',
+  // ... other fields ...
+  maxArticles: 5   // ← Fetch fewer articles
+}
+```
+
+**Multiple Language Support:**
+```javascript
+{
+  name: 'Bilingual Source',
+  nameInBangla: 'দ্বিভাষিক উৎস',
+  url: 'https://example.com/',
+  language: 'Bangla',  // Primary language for detection
+  // ... selectors ...
+}
+```
+
+### 🔄 Workflow Benefits
+
+**Old Method (v1.0-2.0):**
+- ❌ Add 2 new nodes per source (HTTP + Parser)
+- ❌ Duplicate code for each source
+- ❌ Hard to manage many sources
+- ❌ Complex workflow diagram
+
+**New Method (v3.0):**
+- ✅ Edit one configuration node
+- ✅ Add unlimited sources
+- ✅ Single universal parser
+- ✅ Clean, maintainable workflow
+- ✅ Easy to enable/disable sources
+
+### 📊 Scalability
+
+**The workflow can handle:**
+- 6 sources (default) = ~60 articles/run
+- 10 sources = ~100 articles/run
+- 20 sources = ~200 articles/run
+- 50+ sources = adjust limits as needed
+
+**Performance Considerations:**
+- Each source adds ~10-30 seconds
+- AI processing is the slowest part
+- Google Sheets has 10 million cell limit
+- OpenAI costs scale with article count
+
+---
+
+### 📜 Old Method (Legacy - v1.0-2.0)
+
+**For reference only - not recommended for new sources**
+
+<details>
+<summary>Click to expand old method documentation</summary>
+
+#### Step 1: Add HTTP Request Node
 
 ```javascript
 {
@@ -545,13 +847,12 @@ Store in PostgreSQL or MongoDB:
 }
 ```
 
-#### 2. Create Parser Node
+#### Step 2: Create Parser Node
 
 ```javascript
 {
   "parameters": {
     "jsCode": `
-// Extract articles from your new source
 const cheerio = require('cheerio');
 const html = $input.item.json.data;
 const $ = cheerio.load(html);
@@ -560,39 +861,23 @@ const articles = [];
 let count = 0;
 const maxArticles = 10;
 
-// Update selectors based on source HTML structure
-$('article, .news-item, .post').each(function() {
+$('article, .news-item').each(function() {
   if (count >= maxArticles) return false;
   
   const $article = $(this);
-  const title = $article.find('h2, h3, .title').first().text().trim();
+  const title = $article.find('h2, h3').first().text().trim();
   let link = $article.find('a').first().attr('href');
   
-  // Make link absolute
   if (link && !link.startsWith('http')) {
     link = 'https://www.new-source.com' + link;
   }
   
-  const desc = $article.find('p, .excerpt').first().text().trim();
-  let image = $article.find('img').first().attr('src');
-  
-  if (image && !image.startsWith('http')) {
-    image = 'https://www.new-source.com' + image;
-  }
-  
-  const category = $article.find('.category').first().text().trim() || 'সাধারণ';
-  
   if (title && link && title.length > 10) {
     articles.push({
-      source: 'New Source Name',
-      source_url: 'https://www.new-source.com',
+      source: 'New Source',
       title: title,
       link: link,
-      description: desc || title,
-      image: image || '',
-      category: category,
-      scraped_at: new Date().toISOString(),
-      language: 'Bangla'
+      // ... more fields
     });
     count++;
   }
@@ -606,47 +891,11 @@ return articles.map(article => ({ json: article }));
 }
 ```
 
-#### 3. Connect to Merge Node
+#### Step 3: Connect to Merge Node
 
-Add new connection from your parser to the **Merge All Articles** node.
+Add connection from parser to Merge All Articles node.
 
-#### 4. Test the New Source
-
-1. Execute the new HTTP Request node
-2. Check if HTML is fetched
-3. Execute the parser node
-4. Verify articles are extracted correctly
-5. Run full workflow to test integration
-
-### Finding the Right Selectors
-
-**Inspect HTML Structure:**
-
-1. Open news website in browser
-2. Right-click on article → Inspect Element
-3. Note the HTML structure:
-   - Article container: `<article>`, `<div class="news-item">`, etc.
-   - Title: `<h2>`, `<h3>`, `<div class="title">`, etc.
-   - Link: `<a href="...">`, etc.
-   - Image: `<img src="...">`, etc.
-
-**Common Selector Patterns:**
-
-```javascript
-// Articles
-$('article')                    // Semantic HTML5
-$('.news-item, .post-item')    // Class-based
-$('[data-type="article"]')     // Data attributes
-
-// Titles
-$('h1, h2, h3')                // Heading tags
-$('.title, .headline')         // Class-based
-$('[itemprop="headline"]')     // Schema.org
-
-// Links
-$('a[href*="/article/"]')      // URLs containing "/article/"
-$('a.read-more')               // Class-based
-```
+</details>
 
 ---
 
@@ -864,7 +1113,10 @@ seenUrls.add(item.json.link);
 A: Every 2 hours by default. Customizable in Schedule Trigger node.
 
 **Q: How many articles are processed per run?**  
-A: 10 articles per source × 2 sources = 20 articles total per run.
+A: 10 articles per source × 6 sources = ~60 articles total per run (default). Fully customizable per source.
+
+**Q: How many sources are included by default?**  
+A: 6 sources (Prothom Alo, Kaler Kantho, Daily Star, Jugantor, Samakal, Bangladesh Pratidin). Unlimited sources can be added!
 
 **Q: What languages are supported?**  
 A: Bangla (primary) and English (translations). Can be extended to other languages.
@@ -987,7 +1239,23 @@ MIT License - See [LICENSE](../LICENSE) for details.
 
 ## 📊 Changelog
 
-### Version 2.0 (Current - AI-Enhanced)
+### Version 3.0 (Current - Dynamic Multi-Source)
+- ✨ **MAJOR:** Configuration-based source management
+- ✨ **MAJOR:** Add unlimited sources without adding nodes
+- ✨ **MAJOR:** Universal parser works with any source
+- ✅ Streamlined from 17 nodes to 12 nodes
+- ✅ 6 default sources (expandable to unlimited)
+- ✅ Enhanced duplicate detection (URL + similarity)
+- ✅ 18-column Google Sheets output (added Weekday, Language, etc.)
+- ✅ Improved documentation with step-by-step source addition
+- ✅ Advanced Levenshtein distance similarity matching
+- ✅ Automatic fallback parsing strategy
+- ✅ Source-specific article limits
+- ✅ Enable/disable sources with single flag
+- ✅ Comprehensive statistics dashboard
+- ✅ Better performance monitoring
+
+### Version 2.0 (AI-Enhanced - Deprecated)
 - ✅ AI-powered summarization with GPT-4o Mini
 - ✅ Bilingual summaries (Bangla + English)
 - ✅ Sentiment analysis
@@ -997,11 +1265,10 @@ MIT License - See [LICENSE](../LICENSE) for details.
 - ✅ Comprehensive data validation
 - ✅ Google Sheets integration with 14 columns
 - ✅ Summary statistics generation
-- ✅ Detailed documentation with 20+ sections
-- ✅ Multiple news sources support
-- ✅ Error handling and fallbacks
+- ✅ 2 hardcoded sources (Prothom Alo, Kaler Kantho)
+- ❌ Required adding nodes for each source
 
-### Version 1.0 (Basic)
+### Version 1.0 (Basic - Deprecated)
 - Basic web scraping
 - Simple article extraction
 - No AI processing
@@ -1025,4 +1292,5 @@ MIT License - See [LICENSE](../LICENSE) for details.
 
 **Made with ❤️ for the Bangla-speaking community**
 
-*Last Updated: October 2, 2025*
+**Current Version:** 3.0 (Dynamic Multi-Source)  
+*Last Updated: October 2025*

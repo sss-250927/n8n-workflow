@@ -1,570 +1,1137 @@
-{
-  "name": "📰 Bangla News Scraper & AI Summarizer",
-  "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "hours",
-              "hoursInterval": 2
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        240,
-        380
-      ],
-      "id": "schedule-trigger",
-      "name": "Schedule Trigger",
-      "notesInFlow": true,
-      "notes": "Runs every 2 hours to fetch latest news"
-    },
-    {
-      "parameters": {
-        "url": "https://www.prothomalo.com/",
-        "options": {
-          "redirect": {
-            "redirect": {}
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        460,
-        280
-      ],
-      "id": "fetch-prothom-alo",
-      "name": "Fetch Prothom Alo",
-      "notesInFlow": true,
-      "notes": "Fetches HTML from Prothom Alo news site"
-    },
-    {
-      "parameters": {
-        "url": "https://www.kalerkantho.com/",
-        "options": {
-          "redirect": {
-            "redirect": {}
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        460,
-        480
-      ],
-      "id": "fetch-kaler-kantho",
-      "name": "Fetch Kaler Kantho",
-      "notesInFlow": true,
-      "notes": "Fetches HTML from Kaler Kantho news site"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Extract news articles from Prothom Alo HTML\nconst cheerio = require('cheerio');\nconst html = $input.item.json.data;\nconst $ = cheerio.load(html);\n\nconst articles = [];\nlet count = 0;\nconst maxArticles = 10; // Limit to 10 latest articles\n\n// Prothom Alo article selectors\n$('article, .story-card, .news-card').each(function() {\n  if (count >= maxArticles) return false;\n  \n  const $article = $(this);\n  \n  // Extract title\n  const titleElement = $article.find('h1, h2, h3, .title, .headline, a');\n  const title = titleElement.first().text().trim();\n  \n  // Extract link\n  let link = $article.find('a').first().attr('href');\n  if (link && !link.startsWith('http')) {\n    link = 'https://www.prothomalo.com' + (link.startsWith('/') ? link : '/' + link);\n  }\n  \n  // Extract description/excerpt\n  const desc = $article.find('p, .excerpt, .description').first().text().trim();\n  \n  // Extract image\n  let image = $article.find('img').first().attr('src') || $article.find('img').first().attr('data-src');\n  if (image && !image.startsWith('http')) {\n    image = 'https://www.prothomalo.com' + (image.startsWith('/') ? image : '/' + image);\n  }\n  \n  // Extract category\n  const category = $article.find('.category, .section').first().text().trim() || 'সাধারণ';\n  \n  if (title && link && title.length > 10) {\n    articles.push({\n      source: 'Prothom Alo',\n      source_url: 'https://www.prothomalo.com',\n      title: title,\n      link: link,\n      description: desc || title.substring(0, 150) + '...',\n      image: image || '',\n      category: category,\n      scraped_at: new Date().toISOString(),\n      language: 'Bangla'\n    });\n    count++;\n  }\n});\n\nif (articles.length === 0) {\n  // Fallback: Try to find any links with Bangla text\n  $('a').each(function() {\n    if (count >= maxArticles) return false;\n    \n    const title = $(this).text().trim();\n    const link = $(this).attr('href');\n    \n    // Check if title contains Bangla characters\n    const hasBangla = /[\\u0980-\\u09FF]/.test(title);\n    \n    if (hasBangla && title.length > 20 && link) {\n      let fullLink = link;\n      if (!link.startsWith('http')) {\n        fullLink = 'https://www.prothomalo.com' + (link.startsWith('/') ? link : '/' + link);\n      }\n      \n      articles.push({\n        source: 'Prothom Alo',\n        source_url: 'https://www.prothomalo.com',\n        title: title,\n        link: fullLink,\n        description: title,\n        image: '',\n        category: 'সাধারণ',\n        scraped_at: new Date().toISOString(),\n        language: 'Bangla'\n      });\n      count++;\n    }\n  });\n}\n\nreturn articles.map(article => ({ json: article }));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        680,
-        280
-      ],
-      "id": "parse-prothom-alo",
-      "name": "Parse Prothom Alo Articles",
-      "notesInFlow": true,
-      "notes": "Extracts article data from HTML using Cheerio"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Extract news articles from Kaler Kantho HTML\nconst cheerio = require('cheerio');\nconst html = $input.item.json.data;\nconst $ = cheerio.load(html);\n\nconst articles = [];\nlet count = 0;\nconst maxArticles = 10; // Limit to 10 latest articles\n\n// Kaler Kantho article selectors\n$('article, .news-item, .post-item, .story-card').each(function() {\n  if (count >= maxArticles) return false;\n  \n  const $article = $(this);\n  \n  // Extract title\n  const titleElement = $article.find('h1, h2, h3, .title, .post-title, a');\n  const title = titleElement.first().text().trim();\n  \n  // Extract link\n  let link = $article.find('a').first().attr('href');\n  if (link && !link.startsWith('http')) {\n    link = 'https://www.kalerkantho.com' + (link.startsWith('/') ? link : '/' + link);\n  }\n  \n  // Extract description/excerpt\n  const desc = $article.find('p, .excerpt, .summary').first().text().trim();\n  \n  // Extract image\n  let image = $article.find('img').first().attr('src') || $article.find('img').first().attr('data-src');\n  if (image && !image.startsWith('http')) {\n    image = 'https://www.kalerkantho.com' + (image.startsWith('/') ? image : '/' + image);\n  }\n  \n  // Extract category\n  const category = $article.find('.category, .tag').first().text().trim() || 'সাধারণ';\n  \n  if (title && link && title.length > 10) {\n    articles.push({\n      source: 'Kaler Kantho',\n      source_url: 'https://www.kalerkantho.com',\n      title: title,\n      link: link,\n      description: desc || title.substring(0, 150) + '...',\n      image: image || '',\n      category: category,\n      scraped_at: new Date().toISOString(),\n      language: 'Bangla'\n    });\n    count++;\n  }\n});\n\nif (articles.length === 0) {\n  // Fallback: Try to find any links with Bangla text\n  $('a').each(function() {\n    if (count >= maxArticles) return false;\n    \n    const title = $(this).text().trim();\n    const link = $(this).attr('href');\n    \n    // Check if title contains Bangla characters\n    const hasBangla = /[\\u0980-\\u09FF]/.test(title);\n    \n    if (hasBangla && title.length > 20 && link) {\n      let fullLink = link;\n      if (!link.startsWith('http')) {\n        fullLink = 'https://www.kalerkantho.com' + (link.startsWith('/') ? link : '/' + link);\n      }\n      \n      articles.push({\n        source: 'Kaler Kantho',\n        source_url: 'https://www.kalerkantho.com',\n        title: title,\n        link: fullLink,\n        description: title,\n        image: '',\n        category: 'সাধারণ',\n        scraped_at: new Date().toISOString(),\n        language: 'Bangla'\n      });\n      count++;\n    }\n  });\n}\n\nreturn articles.map(article => ({ json: article }));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        680,
-        480
-      ],
-      "id": "parse-kaler-kantho",
-      "name": "Parse Kaler Kantho Articles",
-      "notesInFlow": true,
-      "notes": "Extracts article data from HTML using Cheerio"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        900,
-        380
-      ],
-      "id": "merge-articles",
-      "name": "Merge All Articles",
-      "notesInFlow": true,
-      "notes": "Combines articles from all sources"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "validate-title",
-              "leftValue": "={{ $json.title }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists"
-              }
-            },
-            {
-              "id": "validate-link",
-              "leftValue": "={{ $json.link }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists"
-              }
-            },
-            {
-              "id": "check-bangla",
-              "leftValue": "={{ $json.title }}",
-              "rightValue": "[\\u0980-\\u09FF]",
-              "operator": {
-                "type": "string",
-                "operation": "regex",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1100,
-        380
-      ],
-      "id": "validate-articles",
-      "name": "Validate Articles",
-      "notesInFlow": true,
-      "notes": "Ensures articles have required fields and Bangla text"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Remove duplicate articles based on title similarity\nconst items = $input.all();\nconst uniqueArticles = [];\nconst seenTitles = new Set();\n\nfor (const item of items) {\n  const title = item.json.title.toLowerCase().trim();\n  \n  // Simple deduplication: check if we've seen a very similar title\n  let isDuplicate = false;\n  for (const seenTitle of seenTitles) {\n    const similarity = calculateSimilarity(title, seenTitle);\n    if (similarity > 0.8) { // 80% similarity threshold\n      isDuplicate = true;\n      break;\n    }\n  }\n  \n  if (!isDuplicate) {\n    seenTitles.add(title);\n    uniqueArticles.push(item);\n  }\n}\n\n// Simple string similarity function\nfunction calculateSimilarity(str1, str2) {\n  const longer = str1.length > str2.length ? str1 : str2;\n  const shorter = str1.length > str2.length ? str2 : str1;\n  \n  if (longer.length === 0) return 1.0;\n  \n  const editDistance = getEditDistance(longer, shorter);\n  return (longer.length - editDistance) / longer.length;\n}\n\nfunction getEditDistance(str1, str2) {\n  const costs = [];\n  for (let i = 0; i <= str1.length; i++) {\n    let lastValue = i;\n    for (let j = 0; j <= str2.length; j++) {\n      if (i === 0) {\n        costs[j] = j;\n      } else if (j > 0) {\n        let newValue = costs[j - 1];\n        if (str1.charAt(i - 1) !== str2.charAt(j - 1)) {\n          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;\n        }\n        costs[j - 1] = lastValue;\n        lastValue = newValue;\n      }\n    }\n    if (i > 0) costs[str2.length] = lastValue;\n  }\n  return costs[str2.length];\n}\n\nreturn uniqueArticles;"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1300,
-        380
-      ],
-      "id": "remove-duplicates",
-      "name": "Remove Duplicates",
-      "notesInFlow": true,
-      "notes": "Removes duplicate articles using similarity detection"
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "=Please summarize this Bangla news article:\n\n**Title:** {{ $json.title }}\n\n**Description:** {{ $json.description }}\n\n**Source:** {{ $json.source }}\n\n**Category:** {{ $json.category }}\n\nProvide:\n1. A concise Bangla summary (2-3 sentences)\n2. An English translation of the summary\n3. Key topics/tags (in English, comma-separated)\n4. Sentiment (Positive/Negative/Neutral)",
-        "hasOutputParser": true,
-        "options": {
-          "systemMessage": "You are an expert news analyst and translator specializing in Bangla (Bengali) language content.\n\n**Your Task:**\nAnalyze and summarize Bangla news articles, providing both Bangla and English summaries.\n\n**Instructions:**\n1. Read and understand the Bangla news article\n2. Create a concise summary in Bangla (2-3 sentences)\n3. Translate the summary to English\n4. Identify 3-5 key topics or tags (in English)\n5. Determine the sentiment of the article\n\n**Output Format (JSON):**\n```json\n{\n  \"bangla_summary\": \"বাংলায় সংক্ষিপ্ত সারাংশ\",\n  \"english_summary\": \"Concise English summary\",\n  \"key_topics\": [\"topic1\", \"topic2\", \"topic3\"],\n  \"sentiment\": \"Positive/Negative/Neutral\",\n  \"main_theme\": \"Brief theme description\"\n}\n```\n\n**Important:**\n- Keep summaries concise and factual\n- Maintain the original meaning and context\n- Use proper Bangla Unicode characters\n- Be objective in sentiment analysis\n- Extract meaningful topics for categorization"
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.7,
-      "position": [
-        1500,
-        380
-      ],
-      "id": "ai-summarizer-agent",
-      "name": "AI News Summarizer",
-      "notesInFlow": true,
-      "notes": "AI agent that summarizes news in Bangla and English"
-    },
-    {
-      "parameters": {
-        "model": "gpt-4o-mini",
-        "options": {
-          "temperature": 0.4,
-          "maxTokens": 1000
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1,
-      "position": [
-        1500,
-        556
-      ],
-      "id": "openai-model",
-      "name": "OpenAI GPT-4o Mini",
-      "credentials": {
-        "openAiApi": {
-          "id": "tcD1kui7iDKjBprc",
-          "name": "OpenAi account"
-        }
-      },
-      "notesInFlow": true,
-      "notes": "AI model for summarization (supports multiple languages)"
-    },
-    {
-      "parameters": {
-        "schemaType": "fromJson",
-        "jsonSchema": "={\n  \"type\": \"object\",\n  \"properties\": {\n    \"bangla_summary\": {\n      \"type\": \"string\",\n      \"description\": \"Summary in Bangla\"\n    },\n    \"english_summary\": {\n      \"type\": \"string\",\n      \"description\": \"Summary in English\"\n    },\n    \"key_topics\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"Key topics\"\n    },\n    \"sentiment\": {\n      \"type\": \"string\",\n      \"enum\": [\"Positive\", \"Negative\", \"Neutral\"],\n      \"description\": \"Article sentiment\"\n    },\n    \"main_theme\": {\n      \"type\": \"string\",\n      \"description\": \"Main theme\"\n    }\n  },\n  \"required\": [\"bangla_summary\", \"english_summary\", \"key_topics\", \"sentiment\"]\n}"
-      },
-      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
-      "typeVersion": 1.3,
-      "position": [
-        1700,
-        556
-      ],
-      "id": "structured-output-parser",
-      "name": "Structured Output Parser",
-      "notesInFlow": true,
-      "notes": "Ensures AI returns properly formatted JSON"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Combine scraped article data with AI summary\nconst articleData = $('Validate Articles').item.json;\nconst aiOutput = $input.item.json.output || {};\n\n// Parse AI output if it's a string\nlet summary = aiOutput;\nif (typeof aiOutput === 'string') {\n  try {\n    summary = JSON.parse(aiOutput);\n  } catch (e) {\n    summary = {\n      bangla_summary: aiOutput.substring(0, 200),\n      english_summary: 'Summary not available',\n      key_topics: [],\n      sentiment: 'Neutral',\n      main_theme: ''\n    };\n  }\n}\n\n// Format timestamp\nconst now = new Date();\nconst formattedDate = now.toLocaleDateString('en-GB', {\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\nconst formattedTime = now.toLocaleTimeString('en-US', {\n  hour: '2-digit',\n  minute: '2-digit',\n  hour12: true\n});\n\nreturn [{\n  json: {\n    // Original article data\n    source: articleData.source,\n    source_url: articleData.source_url,\n    title: articleData.title,\n    link: articleData.link,\n    original_description: articleData.description,\n    image: articleData.image,\n    category: articleData.category,\n    language: articleData.language,\n    \n    // AI-generated summaries\n    bangla_summary: summary.bangla_summary || 'সারাংশ পাওয়া যায়নি',\n    english_summary: summary.english_summary || 'Summary not available',\n    key_topics: Array.isArray(summary.key_topics) ? summary.key_topics.join(', ') : '',\n    sentiment: summary.sentiment || 'Neutral',\n    main_theme: summary.main_theme || '',\n    \n    // Metadata\n    scraped_at: articleData.scraped_at,\n    processed_at: now.toISOString(),\n    date: formattedDate,\n    time: formattedTime,\n    year: now.getFullYear(),\n    month: now.getMonth() + 1,\n    day: now.getDate()\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1900,
-        380
-      ],
-      "id": "format-final-data",
-      "name": "Format Final Data",
-      "notesInFlow": true,
-      "notes": "Combines article data with AI summary and formats for storage"
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "",
-          "mode": "list",
-          "cachedResultName": ""
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "Date": "={{ $json.date }}",
-            "Time": "={{ $json.time }}",
-            "Source": "={{ $json.source }}",
-            "Category": "={{ $json.category }}",
-            "Title (Bangla)": "={{ $json.title }}",
-            "Bangla Summary": "={{ $json.bangla_summary }}",
-            "English Summary": "={{ $json.english_summary }}",
-            "Key Topics": "={{ $json.key_topics }}",
-            "Sentiment": "={{ $json.sentiment }}",
-            "Main Theme": "={{ $json.main_theme }}",
-            "Article Link": "={{ $json.link }}",
-            "Image URL": "={{ $json.image }}",
-            "Scraped At": "={{ $json.scraped_at }}",
-            "Processed At": "={{ $json.processed_at }}"
-          }
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.6,
-      "position": [
-        2100,
-        380
-      ],
-      "id": "save-to-sheets",
-      "name": "Save to Google Sheets",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "Ja9l041N41e8rfxC",
-          "name": "Google Sheets account"
-        }
-      },
-      "notesInFlow": true,
-      "notes": "Stores processed news articles with AI summaries"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Generate summary statistics\nconst allItems = $input.all();\nconst totalArticles = allItems.length;\n\n// Count by source\nconst sourceCount = {};\nconst sentimentCount = { Positive: 0, Negative: 0, Neutral: 0 };\nconst categoryCount = {};\n\nfor (const item of allItems) {\n  // Count sources\n  const source = item.json.source;\n  sourceCount[source] = (sourceCount[source] || 0) + 1;\n  \n  // Count sentiment\n  const sentiment = item.json.sentiment || 'Neutral';\n  sentimentCount[sentiment] = (sentimentCount[sentiment] || 0) + 1;\n  \n  // Count categories\n  const category = item.json.category;\n  categoryCount[category] = (categoryCount[category] || 0) + 1;\n}\n\nreturn [{\n  json: {\n    summary: {\n      total_articles: totalArticles,\n      sources: sourceCount,\n      sentiment_distribution: sentimentCount,\n      categories: categoryCount,\n      processed_at: new Date().toISOString(),\n      status: 'Success'\n    }\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2300,
-        380
-      ],
-      "id": "generate-summary",
-      "name": "Generate Summary Stats",
-      "notesInFlow": true,
-      "notes": "Creates summary statistics of processed articles"
-    },
-    {
-      "parameters": {
-        "content": "# 📰 Bangla News Scraper & AI Summarizer\n\n**Automated News Processing Pipeline**\n\n## Features:\n- 🌐 Scrapes from multiple Bangla news sources\n- 🤖 AI-powered summarization (Bangla + English)\n- 📊 Sentiment analysis\n- 🏷️ Topic extraction\n- 📈 Google Sheets integration\n- 🔄 Runs every 2 hours\n- ✨ Duplicate detection\n- ✅ Data validation\n\n## News Sources:\n1. **Prothom Alo** (প্রথম আলো)\n2. **Kaler Kantho** (কালের কণ্ঠ)\n\n## AI Processing:\n- Bangla summary (2-3 sentences)\n- English translation\n- Key topics identification\n- Sentiment analysis\n- Theme extraction\n\n## Output Format:\n- Google Sheets with 14 columns\n- Timestamped entries\n- Organized by date/time\n- Includes article links and images\n\n**Version:** 2.0 (AI-Enhanced)",
-        "height": 683.8307760141093,
-        "width": 442.31914893617025,
-        "color": 7
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        -80,
-        140
-      ],
-      "id": "workflow-info",
-      "name": "Workflow Overview"
-    },
-    {
-      "parameters": {
-        "content": "## 🔍 Web Scraping Phase\n\nFetches HTML from Bangla news websites and extracts article data:\n\n- Title (শিরোনাম)\n- Link (লিংক)\n- Description (বিবরণ)\n- Image (ছবি)\n- Category (বিভাগ)\n- Source metadata\n\nUses **Cheerio** for HTML parsing with fallback selectors for reliability.",
-        "height": 359.81278538812784,
-        "width": 377.55319148936166,
-        "color": 6
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        420,
-        140
-      ],
-      "id": "scraping-info",
-      "name": "Scraping Info"
-    },
-    {
-      "parameters": {
-        "content": "## 🤖 AI Processing Phase\n\n**AI Agent Tasks:**\n1. Analyze Bangla content\n2. Generate Bangla summary\n3. Translate to English\n4. Extract key topics\n5. Determine sentiment\n6. Identify main theme\n\n**Model:** GPT-4o Mini\n- Supports Bangla Unicode\n- Low temperature (0.4) for consistency\n- Structured JSON output\n- Max 1000 tokens per summary",
-        "height": 440,
-        "width": 380,
-        "color": 6
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        1440,
-        140
-      ],
-      "id": "ai-processing-info",
-      "name": "AI Processing Info"
-    },
-    {
-      "parameters": {
-        "content": "## 💾 Data Storage Phase\n\n**Google Sheets Columns:**\n1. Date\n2. Time\n3. Source\n4. Category\n5. Title (Bangla)\n6. Bangla Summary\n7. English Summary\n8. Key Topics\n9. Sentiment\n10. Main Theme\n11. Article Link\n12. Image URL\n13. Scraped At\n14. Processed At\n\nEnables easy filtering, analysis, and reporting.",
-        "height": 440,
-        "width": 380,
-        "color": 6
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        2040,
-        140
-      ],
-      "id": "storage-info",
-      "name": "Storage Info"
-    }
-  ],
-  "pinData": {},
-  "connections": {
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Fetch Prothom Alo",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Fetch Kaler Kantho",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Prothom Alo": {
-      "main": [
-        [
-          {
-            "node": "Parse Prothom Alo Articles",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Kaler Kantho": {
-      "main": [
-        [
-          {
-            "node": "Parse Kaler Kantho Articles",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Prothom Alo Articles": {
-      "main": [
-        [
-          {
-            "node": "Merge All Articles",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Kaler Kantho Articles": {
-      "main": [
-        [
-          {
-            "node": "Merge All Articles",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge All Articles": {
-      "main": [
-        [
-          {
-            "node": "Validate Articles",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate Articles": {
-      "main": [
-        [
-          {
-            "node": "Remove Duplicates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Remove Duplicates": {
-      "main": [
-        [
-          {
-            "node": "AI News Summarizer",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI News Summarizer": {
-      "main": [
-        [
-          {
-            "node": "Format Final Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenAI GPT-4o Mini": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI News Summarizer",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Structured Output Parser": {
-      "ai_outputParser": [
-        [
-          {
-            "node": "AI News Summarizer",
-            "type": "ai_outputParser",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Format Final Data": {
-      "main": [
-        [
-          {
-            "node": "Save to Google Sheets",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save to Google Sheets": {
-      "main": [
-        [
-          {
-            "node": "Generate Summary Stats",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "active": false,
-  "settings": {
-    "executionOrder": "v1",
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "executionTimeout": 600,
-    "timezone": "Asia/Dhaka"
-  },
-  "versionId": "scraper-v2-ai-enhanced",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "c4f1db98ecd74178a70f7f17c9b35261941324e33fdfcec8910ff8cb10d8482d"
-  },
-  "id": "bangla-news-scraper",
-  "tags": [
-    {
-      "createdAt": "2025-10-02T00:00:00.000Z",
-      "updatedAt": "2025-10-02T00:00:00.000Z",
-      "id": "web-scraping",
-      "name": "Web Scraping"
-    },
-    {
-      "createdAt": "2025-10-02T00:00:00.000Z",
-      "updatedAt": "2025-10-02T00:00:00.000Z",
-      "id": "ai-summarization",
-      "name": "AI Summarization"
-    },
-    {
-      "createdAt": "2025-10-02T00:00:00.000Z",
-      "updatedAt": "2025-10-02T00:00:00.000Z",
-      "id": "news-automation",
+{{
+
+  "name": "📰 Bangla News Scraper & AI Summarizer (Dynamic Multi-Source)",  "name": "📰 Bangla News Scraper & AI Summarizer",
+
+  "nodes": [  "nodes": [
+
+    {    {
+
+      "parameters": {      "parameters": {
+
+        "rule": {        "rule": {
+
+          "interval": [          "interval": [
+
+            {            {
+
+              "field": "hours",              "field": "hours",
+
+              "hoursInterval": 2              "hoursInterval": 2
+
+            }            }
+
+          ]          ]
+
+        }        }
+
+      },      },
+
+      "type": "n8n-nodes-base.scheduleTrigger",      "type": "n8n-nodes-base.scheduleTrigger",
+
+      "typeVersion": 1.2,      "typeVersion": 1.2,
+
+      "position": [      "position": [
+
+        240,        240,
+
+        460        380
+
+      ],      ],
+
+      "id": "schedule-trigger",      "id": "schedule-trigger",
+
+      "name": "Schedule Trigger",      "name": "Schedule Trigger",
+
+      "notesInFlow": true,      "notesInFlow": true,
+
+      "notes": "Runs every 2 hours to fetch latest news"      "notes": "Runs every 2 hours to fetch latest news"
+
+    },    },
+
+    {    {
+
+      "parameters": {      "parameters": {
+
+        "jsCode": "// ============================================\n// 📰 NEWS SOURCE CONFIGURATION\n// ============================================\n// Add or modify news sources here!\n// Each source needs: name, url, and selectors\n\nconst newsSources = [\n  {\n    name: 'Prothom Alo',\n    nameInBangla: 'প্রথম আলো',\n    url: 'https://www.prothomalo.com/',\n    language: 'Bangla',\n    selectors: {\n      article: 'article, .story-card, .news-card',\n      title: 'h1, h2, h3, .title, .headline',\n      link: 'a',\n      description: 'p, .excerpt, .description',\n      image: 'img',\n      category: '.category, .section'\n    },\n    maxArticles: 10,\n    enabled: true\n  },\n  {\n    name: 'Kaler Kantho',\n    nameInBangla: 'কালের কণ্ঠ',\n    url: 'https://www.kalerkantho.com/',\n    language: 'Bangla',\n    selectors: {\n      article: 'article, .news-item, .post-item, .story-card',\n      title: 'h1, h2, h3, .title, .post-title',\n      link: 'a',\n      description: 'p, .excerpt, .summary',\n      image: 'img',\n      category: '.category, .tag'\n    },\n    maxArticles: 10,\n    enabled: true\n  },\n  {\n    name: 'The Daily Star',\n    nameInBangla: 'দ্য ডেইলি স্টার',\n    url: 'https://www.thedailystar.net/',\n    language: 'English',\n    selectors: {\n      article: 'article, .news-article, .story',\n      title: 'h1, h2, h3, .headline',\n      link: 'a',\n      description: 'p, .excerpt',\n      image: 'img',\n      category: '.category, .section-name'\n    },\n    maxArticles: 10,\n    enabled: true\n  },\n  {\n    name: 'Jugantor',\n    nameInBangla: 'যুগান্তর',\n    url: 'https://www.jugantor.com/',\n    language: 'Bangla',\n    selectors: {\n      article: 'article, .news-box, .item',\n      title: 'h1, h2, h3, .title',\n      link: 'a',\n      description: 'p, .summary',\n      image: 'img',\n      category: '.cat, .category'\n    },\n    maxArticles: 10,\n    enabled: true\n  },\n  {\n    name: 'Samakal',\n    nameInBangla: 'সমকাল',\n    url: 'https://samakal.com/',\n    language: 'Bangla',\n    selectors: {\n      article: 'article, .news-list-item',\n      title: 'h1, h2, h3',\n      link: 'a',\n      description: 'p',\n      image: 'img',\n      category: '.category'\n    },\n    maxArticles: 10,\n    enabled: true\n  },\n  {\n    name: 'Bangladesh Pratidin',\n    nameInBangla: 'বাংলাদেশ প্রতিদিন',\n    url: 'https://www.bd-pratidin.com/',\n    language: 'Bangla',\n    selectors: {\n      article: 'article, .post',\n      title: 'h1, h2, h3',\n      link: 'a',\n      description: 'p',\n      image: 'img',\n      category: '.category'\n    },\n    maxArticles: 10,\n    enabled: true\n  }\n  // ============================================\n  // 📝 TO ADD A NEW SOURCE:\n  // ============================================\n  // 1. Copy the template below\n  // 2. Update all fields with your source info\n  // 3. Set enabled: true\n  // 4. Save and test!\n  //\n  // {\n  //   name: 'Source Name',\n  //   nameInBangla: 'বাংলা নাম',\n  //   url: 'https://example.com/',\n  //   language: 'Bangla', // or 'English'\n  //   selectors: {\n  //     article: 'article, .news-card',  // Container for each article\n  //     title: 'h2, .headline',          // Title element\n  //     link: 'a',                       // Link element\n  //     description: 'p, .excerpt',      // Description element\n  //     image: 'img',                    // Image element\n  //     category: '.category'            // Category element\n  //   },\n  //   maxArticles: 10,\n  //   enabled: true\n  // },\n];\n\n// Filter only enabled sources\nconst enabledSources = newsSources.filter(source => source.enabled);\n\n// Return one item per source\nreturn enabledSources.map(source => ({\n  json: {\n    source: source,\n    timestamp: new Date().toISOString()\n  }\n}));"        "url": "https://www.prothomalo.com/",
+
+      },        "options": {
+
+      "type": "n8n-nodes-base.code",          "redirect": {
+
+      "typeVersion": 2,            "redirect": {}
+
+      "position": [          }
+
+        460,        }
+
+        460      },
+
+      ],      "type": "n8n-nodes-base.httpRequest",
+
+      "id": "configure-sources",      "typeVersion": 4.2,
+
+      "name": "Configure News Sources",      "position": [
+
+      "notesInFlow": true,        460,
+
+      "notes": "⚙️ EDIT THIS NODE to add/remove news sources!"        280
+
+    },      ],
+
+    {      "id": "fetch-prothom-alo",
+
+      "parameters": {      "name": "Fetch Prothom Alo",
+
+        "url": "={{ $json.source.url }}",      "notesInFlow": true,
+
+        "options": {      "notes": "Fetches HTML from Prothom Alo news site"
+
+          "redirect": {    },
+
+            "redirect": {}    {
+
+          },      "parameters": {
+
+          "timeout": 30000        "url": "https://www.kalerkantho.com/",
+
+        }        "options": {
+
+      },          "redirect": {
+
+      "type": "n8n-nodes-base.httpRequest",            "redirect": {}
+
+      "typeVersion": 4.2,          }
+
+      "position": [        }
+
+        680,      },
+
+        460      "type": "n8n-nodes-base.httpRequest",
+
+      ],      "typeVersion": 4.2,
+
+      "id": "fetch-html",      "position": [
+
+      "name": "Fetch HTML",        460,
+
+      "notesInFlow": true,        480
+
+      "notes": "Dynamically fetches HTML from each configured source"      ],
+
+    },      "id": "fetch-kaler-kantho",
+
+    {      "name": "Fetch Kaler Kantho",
+
+      "parameters": {      "notesInFlow": true,
+
+        "jsCode": "// ============================================\n// 🔍 UNIVERSAL NEWS ARTICLE PARSER\n// ============================================\n// This parser works with ANY news source!\n// It uses the selectors from the source config\n\nconst cheerio = require('cheerio');\nconst sourceConfig = $('Configure News Sources').item.json.source;\nconst html = $input.item.json.data;\nconst $ = cheerio.load(html);\n\nconst articles = [];\nlet count = 0;\nconst maxArticles = sourceConfig.maxArticles || 10;\nconst selectors = sourceConfig.selectors;\n\nconsole.log(`\\n📰 Parsing: ${sourceConfig.name}`);\nconsole.log(`URL: ${sourceConfig.url}`);\nconsole.log(`Max Articles: ${maxArticles}`);\n\n// ============================================\n// PRIMARY PARSING STRATEGY\n// ============================================\n$(selectors.article).each(function() {\n  if (count >= maxArticles) return false;\n  \n  const $article = $(this);\n  \n  // Extract title\n  const titleElement = $article.find(selectors.title);\n  const title = titleElement.first().text().trim();\n  \n  // Extract link\n  let link = $article.find(selectors.link).first().attr('href');\n  if (link && !link.startsWith('http')) {\n    const baseUrl = new URL(sourceConfig.url);\n    link = baseUrl.origin + (link.startsWith('/') ? link : '/' + link);\n  }\n  \n  // Extract description\n  const desc = $article.find(selectors.description).first().text().trim();\n  \n  // Extract image\n  let image = $article.find(selectors.image).first().attr('src') || \n              $article.find(selectors.image).first().attr('data-src') ||\n              $article.find(selectors.image).first().attr('data-lazy-src');\n  if (image && !image.startsWith('http')) {\n    const baseUrl = new URL(sourceConfig.url);\n    image = baseUrl.origin + (image.startsWith('/') ? image : '/' + image);\n  }\n  \n  // Extract category\n  const category = $article.find(selectors.category).first().text().trim() || 'সাধারণ';\n  \n  // Validate article has minimum required fields\n  if (title && link && title.length > 10) {\n    articles.push({\n      source: sourceConfig.name,\n      source_bangla: sourceConfig.nameInBangla,\n      source_url: sourceConfig.url,\n      title: title,\n      link: link,\n      description: desc || title.substring(0, 200) + '...',\n      image: image || '',\n      category: category,\n      scraped_at: new Date().toISOString(),\n      language: sourceConfig.language\n    });\n    count++;\n  }\n});\n\nconsole.log(`✅ Found ${articles.length} articles using primary selectors`);\n\n// ============================================\n// FALLBACK PARSING STRATEGY\n// ============================================\n// If primary parsing found nothing, try fallback\nif (articles.length === 0) {\n  console.log('⚠️ Primary parsing found 0 articles, trying fallback...');\n  \n  $('a').each(function() {\n    if (count >= maxArticles) return false;\n    \n    const title = $(this).text().trim();\n    const link = $(this).attr('href');\n    \n    // Check if title contains Bangla characters (for Bangla sources)\n    const hasBangla = /[\\u0980-\\u09FF]/.test(title);\n    const hasEnglish = /[a-zA-Z]/.test(title);\n    \n    const isValidLanguage = \n      (sourceConfig.language === 'Bangla' && hasBangla) ||\n      (sourceConfig.language === 'English' && hasEnglish);\n    \n    if (isValidLanguage && title.length > 20 && link) {\n      let fullLink = link;\n      if (!link.startsWith('http')) {\n        const baseUrl = new URL(sourceConfig.url);\n        fullLink = baseUrl.origin + (link.startsWith('/') ? link : '/' + link);\n      }\n      \n      articles.push({\n        source: sourceConfig.name,\n        source_bangla: sourceConfig.nameInBangla,\n        source_url: sourceConfig.url,\n        title: title,\n        link: fullLink,\n        description: title,\n        image: '',\n        category: 'সাধারণ',\n        scraped_at: new Date().toISOString(),\n        language: sourceConfig.language\n      });\n      count++;\n    }\n  });\n  \n  console.log(`✅ Fallback found ${articles.length} articles`);\n}\n\nconsole.log(`\\n📊 Total articles extracted: ${articles.length}\\n`);\n\nreturn articles.map(article => ({ json: article }));"      "notes": "Fetches HTML from Kaler Kantho news site"
+
+      },    },
+
+      "type": "n8n-nodes-base.code",    {
+
+      "typeVersion": 2,      "parameters": {
+
+      "position": [        "jsCode": "// Extract news articles from Prothom Alo HTML\nconst cheerio = require('cheerio');\nconst html = $input.item.json.data;\nconst $ = cheerio.load(html);\n\nconst articles = [];\nlet count = 0;\nconst maxArticles = 10; // Limit to 10 latest articles\n\n// Prothom Alo article selectors\n$('article, .story-card, .news-card').each(function() {\n  if (count >= maxArticles) return false;\n  \n  const $article = $(this);\n  \n  // Extract title\n  const titleElement = $article.find('h1, h2, h3, .title, .headline, a');\n  const title = titleElement.first().text().trim();\n  \n  // Extract link\n  let link = $article.find('a').first().attr('href');\n  if (link && !link.startsWith('http')) {\n    link = 'https://www.prothomalo.com' + (link.startsWith('/') ? link : '/' + link);\n  }\n  \n  // Extract description/excerpt\n  const desc = $article.find('p, .excerpt, .description').first().text().trim();\n  \n  // Extract image\n  let image = $article.find('img').first().attr('src') || $article.find('img').first().attr('data-src');\n  if (image && !image.startsWith('http')) {\n    image = 'https://www.prothomalo.com' + (image.startsWith('/') ? image : '/' + image);\n  }\n  \n  // Extract category\n  const category = $article.find('.category, .section').first().text().trim() || 'সাধারণ';\n  \n  if (title && link && title.length > 10) {\n    articles.push({\n      source: 'Prothom Alo',\n      source_url: 'https://www.prothomalo.com',\n      title: title,\n      link: link,\n      description: desc || title.substring(0, 150) + '...',\n      image: image || '',\n      category: category,\n      scraped_at: new Date().toISOString(),\n      language: 'Bangla'\n    });\n    count++;\n  }\n});\n\nif (articles.length === 0) {\n  // Fallback: Try to find any links with Bangla text\n  $('a').each(function() {\n    if (count >= maxArticles) return false;\n    \n    const title = $(this).text().trim();\n    const link = $(this).attr('href');\n    \n    // Check if title contains Bangla characters\n    const hasBangla = /[\\u0980-\\u09FF]/.test(title);\n    \n    if (hasBangla && title.length > 20 && link) {\n      let fullLink = link;\n      if (!link.startsWith('http')) {\n        fullLink = 'https://www.prothomalo.com' + (link.startsWith('/') ? link : '/' + link);\n      }\n      \n      articles.push({\n        source: 'Prothom Alo',\n        source_url: 'https://www.prothomalo.com',\n        title: title,\n        link: fullLink,\n        description: title,\n        image: '',\n        category: 'সাধারণ',\n        scraped_at: new Date().toISOString(),\n        language: 'Bangla'\n      });\n      count++;\n    }\n  });\n}\n\nreturn articles.map(article => ({ json: article }));"
+
+        900,      },
+
+        460      "type": "n8n-nodes-base.code",
+
+      ],      "typeVersion": 2,
+
+      "id": "parse-articles",      "position": [
+
+      "name": "Parse Articles (Universal)",        680,
+
+      "notesInFlow": true,        280
+
+      "notes": "Universal parser that works with any source configuration"      ],
+
+    },      "id": "parse-prothom-alo",
+
+    {      "name": "Parse Prothom Alo Articles",
+
+      "parameters": {},      "notesInFlow": true,
+
+      "type": "n8n-nodes-base.merge",      "notes": "Extracts article data from HTML using Cheerio"
+
+      "typeVersion": 3,    },
+
+      "position": [    {
+
+        1120,      "parameters": {
+
+        460        "jsCode": "// Extract news articles from Kaler Kantho HTML\nconst cheerio = require('cheerio');\nconst html = $input.item.json.data;\nconst $ = cheerio.load(html);\n\nconst articles = [];\nlet count = 0;\nconst maxArticles = 10; // Limit to 10 latest articles\n\n// Kaler Kantho article selectors\n$('article, .news-item, .post-item, .story-card').each(function() {\n  if (count >= maxArticles) return false;\n  \n  const $article = $(this);\n  \n  // Extract title\n  const titleElement = $article.find('h1, h2, h3, .title, .post-title, a');\n  const title = titleElement.first().text().trim();\n  \n  // Extract link\n  let link = $article.find('a').first().attr('href');\n  if (link && !link.startsWith('http')) {\n    link = 'https://www.kalerkantho.com' + (link.startsWith('/') ? link : '/' + link);\n  }\n  \n  // Extract description/excerpt\n  const desc = $article.find('p, .excerpt, .summary').first().text().trim();\n  \n  // Extract image\n  let image = $article.find('img').first().attr('src') || $article.find('img').first().attr('data-src');\n  if (image && !image.startsWith('http')) {\n    image = 'https://www.kalerkantho.com' + (image.startsWith('/') ? image : '/' + image);\n  }\n  \n  // Extract category\n  const category = $article.find('.category, .tag').first().text().trim() || 'সাধারণ';\n  \n  if (title && link && title.length > 10) {\n    articles.push({\n      source: 'Kaler Kantho',\n      source_url: 'https://www.kalerkantho.com',\n      title: title,\n      link: link,\n      description: desc || title.substring(0, 150) + '...',\n      image: image || '',\n      category: category,\n      scraped_at: new Date().toISOString(),\n      language: 'Bangla'\n    });\n    count++;\n  }\n});\n\nif (articles.length === 0) {\n  // Fallback: Try to find any links with Bangla text\n  $('a').each(function() {\n    if (count >= maxArticles) return false;\n    \n    const title = $(this).text().trim();\n    const link = $(this).attr('href');\n    \n    // Check if title contains Bangla characters\n    const hasBangla = /[\\u0980-\\u09FF]/.test(title);\n    \n    if (hasBangla && title.length > 20 && link) {\n      let fullLink = link;\n      if (!link.startsWith('http')) {\n        fullLink = 'https://www.kalerkantho.com' + (link.startsWith('/') ? link : '/' + link);\n      }\n      \n      articles.push({\n        source: 'Kaler Kantho',\n        source_url: 'https://www.kalerkantho.com',\n        title: title,\n        link: fullLink,\n        description: title,\n        image: '',\n        category: 'সাধারণ',\n        scraped_at: new Date().toISOString(),\n        language: 'Bangla'\n      });\n      count++;\n    }\n  });\n}\n\nreturn articles.map(article => ({ json: article }));"
+
+      ],      },
+
+      "id": "merge-all-articles",      "type": "n8n-nodes-base.code",
+
+      "name": "Merge All Sources",      "typeVersion": 2,
+
+      "notesInFlow": true,      "position": [
+
+      "notes": "Combines articles from ALL configured sources"        680,
+
+    },        480
+
+    {      ],
+
+      "parameters": {      "id": "parse-kaler-kantho",
+
+        "conditions": {      "name": "Parse Kaler Kantho Articles",
+
+          "options": {      "notesInFlow": true,
+
+            "caseSensitive": false,      "notes": "Extracts article data from HTML using Cheerio"
+
+            "leftValue": "",    },
+
+            "typeValidation": "loose"    {
+
+          },      "parameters": {},
+
+          "conditions": [      "type": "n8n-nodes-base.merge",
+
+            {      "typeVersion": 3,
+
+              "id": "validate-title",      "position": [
+
+              "leftValue": "={{ $json.title }}",        900,
+
+              "rightValue": "",        380
+
+              "operator": {      ],
+
+                "type": "string",      "id": "merge-articles",
+
+                "operation": "exists"      "name": "Merge All Articles",
+
+              }      "notesInFlow": true,
+
+            },      "notes": "Combines articles from all sources"
+
+            {    },
+
+              "id": "validate-link",    {
+
+              "leftValue": "={{ $json.link }}",      "parameters": {
+
+              "rightValue": "",        "conditions": {
+
+              "operator": {          "options": {
+
+                "type": "string",            "caseSensitive": false,
+
+                "operation": "exists"            "leftValue": "",
+
+              }            "typeValidation": "loose"
+
+            },          },
+
+            {          "conditions": [
+
+              "id": "validate-length",            {
+
+              "leftValue": "={{ $json.title.length }}",              "id": "validate-title",
+
+              "rightValue": "10",              "leftValue": "={{ $json.title }}",
+
+              "operator": {              "rightValue": "",
+
+                "type": "number",              "operator": {
+
+                "operation": "gt"                "type": "string",
+
+              }                "operation": "exists"
+
+            }              }
+
+          ],            },
+
+          "combinator": "and"            {
+
+        },              "id": "validate-link",
+
+        "options": {}              "leftValue": "={{ $json.link }}",
+
+      },              "rightValue": "",
+
+      "type": "n8n-nodes-base.if",              "operator": {
+
+      "typeVersion": 2.2,                "type": "string",
+
+      "position": [                "operation": "exists"
+
+        1320,              }
+
+        460            },
+
+      ],            {
+
+      "id": "validate-articles",              "id": "check-bangla",
+
+      "name": "Validate Articles",              "leftValue": "={{ $json.title }}",
+
+      "notesInFlow": true,              "rightValue": "[\\u0980-\\u09FF]",
+
+      "notes": "Ensures articles have required fields"              "operator": {
+
+    },                "type": "string",
+
+    {                "operation": "regex",
+
+      "parameters": {                "singleValue": true
+
+        "jsCode": "// ============================================\n// 🔄 ADVANCED DUPLICATE REMOVAL\n// ============================================\n// Uses multiple strategies to detect duplicates:\n// 1. Exact URL matching\n// 2. Title similarity (Levenshtein distance)\n// 3. Content fingerprinting\n\nconst items = $input.all();\nconst uniqueArticles = [];\nconst seenUrls = new Set();\nconst seenTitles = new Set();\n\nconsole.log(`\\n🔍 Checking ${items.length} articles for duplicates...`);\n\nfor (const item of items) {\n  const title = item.json.title.toLowerCase().trim();\n  const url = item.json.link;\n  \n  let isDuplicate = false;\n  \n  // Strategy 1: Check exact URL match\n  if (seenUrls.has(url)) {\n    console.log(`❌ Duplicate URL: ${item.json.source} - ${title.substring(0, 50)}...`);\n    isDuplicate = true;\n    continue;\n  }\n  \n  // Strategy 2: Check title similarity\n  for (const seenTitle of seenTitles) {\n    const similarity = calculateSimilarity(title, seenTitle);\n    if (similarity > 0.85) { // 85% similarity threshold\n      console.log(`❌ Duplicate Title (${Math.round(similarity * 100)}% match): ${title.substring(0, 50)}...`);\n      isDuplicate = true;\n      break;\n    }\n  }\n  \n  if (!isDuplicate) {\n    seenUrls.add(url);\n    seenTitles.add(title);\n    uniqueArticles.push(item);\n    console.log(`✅ Unique: ${item.json.source} - ${title.substring(0, 50)}...`);\n  }\n}\n\nconsole.log(`\\n📊 Results:`);\nconsole.log(`   Total articles: ${items.length}`);\nconsole.log(`   Unique articles: ${uniqueArticles.length}`);\nconsole.log(`   Duplicates removed: ${items.length - uniqueArticles.length}\\n`);\n\n// ============================================\n// SIMILARITY CALCULATION FUNCTIONS\n// ============================================\n\nfunction calculateSimilarity(str1, str2) {\n  const longer = str1.length > str2.length ? str1 : str2;\n  const shorter = str1.length > str2.length ? str2 : str1;\n  \n  if (longer.length === 0) return 1.0;\n  \n  const editDistance = getEditDistance(longer, shorter);\n  return (longer.length - editDistance) / longer.length;\n}\n\nfunction getEditDistance(str1, str2) {\n  const costs = [];\n  for (let i = 0; i <= str1.length; i++) {\n    let lastValue = i;\n    for (let j = 0; j <= str2.length; j++) {\n      if (i === 0) {\n        costs[j] = j;\n      } else if (j > 0) {\n        let newValue = costs[j - 1];\n        if (str1.charAt(i - 1) !== str2.charAt(j - 1)) {\n          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;\n        }\n        costs[j - 1] = lastValue;\n        lastValue = newValue;\n      }\n    }\n    if (i > 0) costs[str2.length] = lastValue;\n  }\n  return costs[str2.length];\n}\n\nreturn uniqueArticles;"              }
+
+      },            }
+
+      "type": "n8n-nodes-base.code",          ],
+
+      "typeVersion": 2,          "combinator": "and"
+
+      "position": [        },
+
+        1520,        "options": {}
+
+        460      },
+
+      ],      "type": "n8n-nodes-base.if",
+
+      "id": "remove-duplicates",      "typeVersion": 2.2,
+
+      "name": "Remove Duplicates",      "position": [
+
+      "notesInFlow": true,        1100,
+
+      "notes": "Advanced deduplication using URL + title similarity"        380
+
+    },      ],
+
+    {      "id": "validate-articles",
+
+      "parameters": {      "name": "Validate Articles",
+
+        "promptType": "define",      "notesInFlow": true,
+
+        "text": "=Please analyze this news article:\n\n**Source:** {{ $json.source }} ({{ $json.source_bangla }})\n**Language:** {{ $json.language }}\n**Title:** {{ $json.title }}\n**Description:** {{ $json.description }}\n**Category:** {{ $json.category }}\n\nProvide:\n1. A concise summary in the article's original language (2-3 sentences)\n2. An English translation of the summary (if not already in English)\n3. Key topics/tags (in English, comma-separated)\n4. Sentiment (Positive/Negative/Neutral)\n5. Main theme description",      "notes": "Ensures articles have required fields and Bangla text"
+
+        "hasOutputParser": true,    },
+
+        "options": {    {
+
+          "systemMessage": "You are an expert multilingual news analyst and translator specializing in Bangla (Bengali), English, and other South Asian languages.\n\n**Your Task:**\nAnalyze news articles from various sources and provide comprehensive summaries in multiple languages.\n\n**Instructions:**\n1. Identify the article's language (Bangla, English, or other)\n2. Read and understand the content thoroughly\n3. Create a concise summary in the ORIGINAL language (2-3 sentences)\n4. If the article is in Bangla, translate the summary to English\n5. If the article is already in English, provide the English summary only\n6. Identify 3-5 key topics or tags (always in English for consistency)\n7. Determine the overall sentiment\n8. Extract the main theme\n\n**Output Format (JSON):**\n```json\n{\n  \"original_summary\": \"Summary in article's original language\",\n  \"english_summary\": \"English translation or original English summary\",\n  \"key_topics\": [\"topic1\", \"topic2\", \"topic3\"],\n  \"sentiment\": \"Positive/Negative/Neutral\",\n  \"main_theme\": \"Brief theme description\"\n}\n```\n\n**Important:**\n- Keep summaries concise and factual\n- Maintain the original meaning and context\n- Use proper Unicode characters for Bangla text\n- Be objective in sentiment analysis\n- Extract meaningful topics for categorization\n- Handle both Bangla (\\u0980-\\u09FF) and English text properly"      "parameters": {
+
+        }        "jsCode": "// Remove duplicate articles based on title similarity\nconst items = $input.all();\nconst uniqueArticles = [];\nconst seenTitles = new Set();\n\nfor (const item of items) {\n  const title = item.json.title.toLowerCase().trim();\n  \n  // Simple deduplication: check if we've seen a very similar title\n  let isDuplicate = false;\n  for (const seenTitle of seenTitles) {\n    const similarity = calculateSimilarity(title, seenTitle);\n    if (similarity > 0.8) { // 80% similarity threshold\n      isDuplicate = true;\n      break;\n    }\n  }\n  \n  if (!isDuplicate) {\n    seenTitles.add(title);\n    uniqueArticles.push(item);\n  }\n}\n\n// Simple string similarity function\nfunction calculateSimilarity(str1, str2) {\n  const longer = str1.length > str2.length ? str1 : str2;\n  const shorter = str1.length > str2.length ? str2 : str1;\n  \n  if (longer.length === 0) return 1.0;\n  \n  const editDistance = getEditDistance(longer, shorter);\n  return (longer.length - editDistance) / longer.length;\n}\n\nfunction getEditDistance(str1, str2) {\n  const costs = [];\n  for (let i = 0; i <= str1.length; i++) {\n    let lastValue = i;\n    for (let j = 0; j <= str2.length; j++) {\n      if (i === 0) {\n        costs[j] = j;\n      } else if (j > 0) {\n        let newValue = costs[j - 1];\n        if (str1.charAt(i - 1) !== str2.charAt(j - 1)) {\n          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;\n        }\n        costs[j - 1] = lastValue;\n        lastValue = newValue;\n      }\n    }\n    if (i > 0) costs[str2.length] = lastValue;\n  }\n  return costs[str2.length];\n}\n\nreturn uniqueArticles;"
+
+      },      },
+
+      "type": "@n8n/n8n-nodes-langchain.agent",      "type": "n8n-nodes-base.code",
+
+      "typeVersion": 1.7,      "typeVersion": 2,
+
+      "position": [      "position": [
+
+        1720,        1300,
+
+        460        380
+
+      ],      ],
+
+      "id": "ai-summarizer",      "id": "remove-duplicates",
+
+      "name": "AI News Summarizer",      "name": "Remove Duplicates",
+
+      "notesInFlow": true,      "notesInFlow": true,
+
+      "notes": "Multilingual AI summarization for any language"      "notes": "Removes duplicate articles using similarity detection"
+
+    },    },
+
+    {    {
+
+      "parameters": {      "parameters": {
+
+        "model": "gpt-4o-mini",        "promptType": "define",
+
+        "options": {        "text": "=Please summarize this Bangla news article:\n\n**Title:** {{ $json.title }}\n\n**Description:** {{ $json.description }}\n\n**Source:** {{ $json.source }}\n\n**Category:** {{ $json.category }}\n\nProvide:\n1. A concise Bangla summary (2-3 sentences)\n2. An English translation of the summary\n3. Key topics/tags (in English, comma-separated)\n4. Sentiment (Positive/Negative/Neutral)",
+
+          "temperature": 0.4,        "hasOutputParser": true,
+
+          "maxTokens": 1200        "options": {
+
+        }          "systemMessage": "You are an expert news analyst and translator specializing in Bangla (Bengali) language content.\n\n**Your Task:**\nAnalyze and summarize Bangla news articles, providing both Bangla and English summaries.\n\n**Instructions:**\n1. Read and understand the Bangla news article\n2. Create a concise summary in Bangla (2-3 sentences)\n3. Translate the summary to English\n4. Identify 3-5 key topics or tags (in English)\n5. Determine the sentiment of the article\n\n**Output Format (JSON):**\n```json\n{\n  \"bangla_summary\": \"বাংলায় সংক্ষিপ্ত সারাংশ\",\n  \"english_summary\": \"Concise English summary\",\n  \"key_topics\": [\"topic1\", \"topic2\", \"topic3\"],\n  \"sentiment\": \"Positive/Negative/Neutral\",\n  \"main_theme\": \"Brief theme description\"\n}\n```\n\n**Important:**\n- Keep summaries concise and factual\n- Maintain the original meaning and context\n- Use proper Bangla Unicode characters\n- Be objective in sentiment analysis\n- Extract meaningful topics for categorization"
+
+      },        }
+
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",      },
+
+      "typeVersion": 1,      "type": "@n8n/n8n-nodes-langchain.agent",
+
+      "position": [      "typeVersion": 1.7,
+
+        1720,      "position": [
+
+        636        1500,
+
+      ],        380
+
+      "id": "openai-model",      ],
+
+      "name": "OpenAI GPT-4o Mini",      "id": "ai-summarizer-agent",
+
+      "credentials": {      "name": "AI News Summarizer",
+
+        "openAiApi": {      "notesInFlow": true,
+
+          "id": "tcD1kui7iDKjBprc",      "notes": "AI agent that summarizes news in Bangla and English"
+
+          "name": "OpenAi account"    },
+
+        }    {
+
+      },      "parameters": {
+
+      "notesInFlow": true,        "model": "gpt-4o-mini",
+
+      "notes": "Multilingual AI model (Bangla + English support)"        "options": {
+
+    },          "temperature": 0.4,
+
+    {          "maxTokens": 1000
+
+      "parameters": {        }
+
+        "schemaType": "fromJson",      },
+
+        "jsonSchema": "={\n  \"type\": \"object\",\n  \"properties\": {\n    \"original_summary\": {\n      \"type\": \"string\",\n      \"description\": \"Summary in original language\"\n    },\n    \"english_summary\": {\n      \"type\": \"string\",\n      \"description\": \"English summary/translation\"\n    },\n    \"key_topics\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"Key topics in English\"\n    },\n    \"sentiment\": {\n      \"type\": \"string\",\n      \"enum\": [\"Positive\", \"Negative\", \"Neutral\"],\n      \"description\": \"Article sentiment\"\n    },\n    \"main_theme\": {\n      \"type\": \"string\",\n      \"description\": \"Main theme\"\n    }\n  },\n  \"required\": [\"original_summary\", \"english_summary\", \"key_topics\", \"sentiment\"]\n}"      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+
+      },      "typeVersion": 1,
+
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",      "position": [
+
+      "typeVersion": 1.3,        1500,
+
+      "position": [        556
+
+        1920,      ],
+
+        636      "id": "openai-model",
+
+      ],      "name": "OpenAI GPT-4o Mini",
+
+      "id": "output-parser",      "credentials": {
+
+      "name": "Structured Output Parser",        "openAiApi": {
+
+      "notesInFlow": true,          "id": "tcD1kui7iDKjBprc",
+
+      "notes": "Ensures consistent JSON output from AI"          "name": "OpenAi account"
+
+    },        }
+
+    {      },
+
+      "parameters": {      "notesInFlow": true,
+
+        "jsCode": "// ============================================\n// 📝 FORMAT FINAL DATA FOR STORAGE\n// ============================================\n// Combines scraped article data with AI summaries\n// and formats everything for Google Sheets\n\nconst articleData = $('Validate Articles').item.json;\nconst aiOutput = $input.item.json.output || {};\n\n// Parse AI output if it's a string\nlet summary = aiOutput;\nif (typeof aiOutput === 'string') {\n  try {\n    summary = JSON.parse(aiOutput);\n  } catch (e) {\n    console.error('Failed to parse AI output:', e);\n    summary = {\n      original_summary: aiOutput.substring(0, 300),\n      english_summary: 'Summary not available',\n      key_topics: [],\n      sentiment: 'Neutral',\n      main_theme: ''\n    };\n  }\n}\n\n// Format timestamps\nconst now = new Date();\nconst formattedDate = now.toLocaleDateString('en-GB', {\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\nconst formattedTime = now.toLocaleTimeString('en-US', {\n  hour: '2-digit',\n  minute: '2-digit',\n  hour12: true\n});\n\n// Calculate processing time\nconst scrapedAt = new Date(articleData.scraped_at);\nconst processingTimeMs = now - scrapedAt;\nconst processingTimeSec = (processingTimeMs / 1000).toFixed(2);\n\nreturn [{\n  json: {\n    // ============================================\n    // ARTICLE METADATA\n    // ============================================\n    source: articleData.source,\n    source_bangla: articleData.source_bangla || articleData.source,\n    source_url: articleData.source_url,\n    language: articleData.language,\n    \n    // ============================================\n    // ORIGINAL ARTICLE DATA\n    // ============================================\n    title: articleData.title,\n    link: articleData.link,\n    original_description: articleData.description,\n    image: articleData.image,\n    category: articleData.category,\n    \n    // ============================================\n    // AI-GENERATED SUMMARIES\n    // ============================================\n    original_summary: summary.original_summary || 'সারাংশ পাওয়া যায়নি',\n    english_summary: summary.english_summary || 'Summary not available',\n    key_topics: Array.isArray(summary.key_topics) \n      ? summary.key_topics.join(', ') \n      : '',\n    sentiment: summary.sentiment || 'Neutral',\n    main_theme: summary.main_theme || '',\n    \n    // ============================================\n    // TIMESTAMPS & METADATA\n    // ============================================\n    scraped_at: articleData.scraped_at,\n    processed_at: now.toISOString(),\n    processing_time_sec: processingTimeSec,\n    date: formattedDate,\n    time: formattedTime,\n    year: now.getFullYear(),\n    month: now.getMonth() + 1,\n    day: now.getDate(),\n    weekday: now.toLocaleDateString('en-US', { weekday: 'long' })\n  }\n}];"      "notes": "AI model for summarization (supports multiple languages)"
+
+      },    },
+
+      "type": "n8n-nodes-base.code",    {
+
+      "typeVersion": 2,      "parameters": {
+
+      "position": [        "schemaType": "fromJson",
+
+        2120,        "jsonSchema": "={\n  \"type\": \"object\",\n  \"properties\": {\n    \"bangla_summary\": {\n      \"type\": \"string\",\n      \"description\": \"Summary in Bangla\"\n    },\n    \"english_summary\": {\n      \"type\": \"string\",\n      \"description\": \"Summary in English\"\n    },\n    \"key_topics\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"Key topics\"\n    },\n    \"sentiment\": {\n      \"type\": \"string\",\n      \"enum\": [\"Positive\", \"Negative\", \"Neutral\"],\n      \"description\": \"Article sentiment\"\n    },\n    \"main_theme\": {\n      \"type\": \"string\",\n      \"description\": \"Main theme\"\n    }\n  },\n  \"required\": [\"bangla_summary\", \"english_summary\", \"key_topics\", \"sentiment\"]\n}"
+
+        460      },
+
+      ],      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+
+      "id": "format-data",      "typeVersion": 1.3,
+
+      "name": "Format Final Data",      "position": [
+
+      "notesInFlow": true,        1700,
+
+      "notes": "Combines all data and formats for storage"        556
+
+    },      ],
+
+    {      "id": "structured-output-parser",
+
+      "parameters": {      "name": "Structured Output Parser",
+
+        "operation": "append",      "notesInFlow": true,
+
+        "documentId": {      "notes": "Ensures AI returns properly formatted JSON"
+
+          "__rl": true,    },
+
+          "value": "",    {
+
+          "mode": "list",      "parameters": {
+
+          "cachedResultName": ""        "jsCode": "// Combine scraped article data with AI summary\nconst articleData = $('Validate Articles').item.json;\nconst aiOutput = $input.item.json.output || {};\n\n// Parse AI output if it's a string\nlet summary = aiOutput;\nif (typeof aiOutput === 'string') {\n  try {\n    summary = JSON.parse(aiOutput);\n  } catch (e) {\n    summary = {\n      bangla_summary: aiOutput.substring(0, 200),\n      english_summary: 'Summary not available',\n      key_topics: [],\n      sentiment: 'Neutral',\n      main_theme: ''\n    };\n  }\n}\n\n// Format timestamp\nconst now = new Date();\nconst formattedDate = now.toLocaleDateString('en-GB', {\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\nconst formattedTime = now.toLocaleTimeString('en-US', {\n  hour: '2-digit',\n  minute: '2-digit',\n  hour12: true\n});\n\nreturn [{\n  json: {\n    // Original article data\n    source: articleData.source,\n    source_url: articleData.source_url,\n    title: articleData.title,\n    link: articleData.link,\n    original_description: articleData.description,\n    image: articleData.image,\n    category: articleData.category,\n    language: articleData.language,\n    \n    // AI-generated summaries\n    bangla_summary: summary.bangla_summary || 'সারাংশ পাওয়া যায়নি',\n    english_summary: summary.english_summary || 'Summary not available',\n    key_topics: Array.isArray(summary.key_topics) ? summary.key_topics.join(', ') : '',\n    sentiment: summary.sentiment || 'Neutral',\n    main_theme: summary.main_theme || '',\n    \n    // Metadata\n    scraped_at: articleData.scraped_at,\n    processed_at: now.toISOString(),\n    date: formattedDate,\n    time: formattedTime,\n    year: now.getFullYear(),\n    month: now.getMonth() + 1,\n    day: now.getDate()\n  }\n}];"
+
+        },      },
+
+        "sheetName": {      "type": "n8n-nodes-base.code",
+
+          "__rl": true,      "typeVersion": 2,
+
+          "value": "gid=0",      "position": [
+
+          "mode": "list",        1900,
+
+          "cachedResultName": "Sheet1"        380
+
+        },      ],
+
+        "columns": {      "id": "format-final-data",
+
+          "mappingMode": "defineBelow",      "name": "Format Final Data",
+
+          "value": {      "notesInFlow": true,
+
+            "Date": "={{ $json.date }}",      "notes": "Combines article data with AI summary and formats for storage"
+
+            "Time": "={{ $json.time }}",    },
+
+            "Weekday": "={{ $json.weekday }}",    {
+
+            "Source": "={{ $json.source }}",      "parameters": {
+
+            "Source (Bangla)": "={{ $json.source_bangla }}",        "operation": "append",
+
+            "Language": "={{ $json.language }}",        "documentId": {
+
+            "Category": "={{ $json.category }}",          "__rl": true,
+
+            "Title": "={{ $json.title }}",          "value": "",
+
+            "Original Summary": "={{ $json.original_summary }}",          "mode": "list",
+
+            "English Summary": "={{ $json.english_summary }}",          "cachedResultName": ""
+
+            "Key Topics": "={{ $json.key_topics }}",        },
+
+            "Sentiment": "={{ $json.sentiment }}",        "sheetName": {
+
+            "Main Theme": "={{ $json.main_theme }}",          "__rl": true,
+
+            "Article Link": "={{ $json.link }}",          "value": "gid=0",
+
+            "Image URL": "={{ $json.image }}",          "mode": "list",
+
+            "Scraped At": "={{ $json.scraped_at }}",          "cachedResultName": "Sheet1"
+
+            "Processed At": "={{ $json.processed_at }}",        },
+
+            "Processing Time (sec)": "={{ $json.processing_time_sec }}"        "columns": {
+
+          }          "mappingMode": "defineBelow",
+
+        },          "value": {
+
+        "options": {}            "Date": "={{ $json.date }}",
+
+      },            "Time": "={{ $json.time }}",
+
+      "type": "n8n-nodes-base.googleSheets",            "Source": "={{ $json.source }}",
+
+      "typeVersion": 4.6,            "Category": "={{ $json.category }}",
+
+      "position": [            "Title (Bangla)": "={{ $json.title }}",
+
+        2320,            "Bangla Summary": "={{ $json.bangla_summary }}",
+
+        460            "English Summary": "={{ $json.english_summary }}",
+
+      ],            "Key Topics": "={{ $json.key_topics }}",
+
+      "id": "save-to-sheets",            "Sentiment": "={{ $json.sentiment }}",
+
+      "name": "Save to Google Sheets",            "Main Theme": "={{ $json.main_theme }}",
+
+      "credentials": {            "Article Link": "={{ $json.link }}",
+
+        "googleSheetsOAuth2Api": {            "Image URL": "={{ $json.image }}",
+
+          "id": "Ja9l041N41e8rfxC",            "Scraped At": "={{ $json.scraped_at }}",
+
+          "name": "Google Sheets account"            "Processed At": "={{ $json.processed_at }}"
+
+        }          }
+
+      },        },
+
+      "notesInFlow": true,        "options": {}
+
+      "notes": "Stores all articles with comprehensive metadata"      },
+
+    },      "type": "n8n-nodes-base.googleSheets",
+
+    {      "typeVersion": 4.6,
+
+      "parameters": {      "position": [
+
+        "jsCode": "// ============================================\n// 📊 GENERATE COMPREHENSIVE STATISTICS\n// ============================================\n\nconst allItems = $input.all();\nconst totalArticles = allItems.length;\n\n// Initialize counters\nconst sourceCount = {};\nconst languageCount = {};\nconst sentimentCount = { Positive: 0, Negative: 0, Neutral: 0 };\nconst categoryCount = {};\nconst topicCount = {};\n\n// Calculate statistics\nfor (const item of allItems) {\n  // Count by source\n  const source = item.json.source;\n  sourceCount[source] = (sourceCount[source] || 0) + 1;\n  \n  // Count by language\n  const language = item.json.language;\n  languageCount[language] = (languageCount[language] || 0) + 1;\n  \n  // Count by sentiment\n  const sentiment = item.json.sentiment || 'Neutral';\n  sentimentCount[sentiment] = (sentimentCount[sentiment] || 0) + 1;\n  \n  // Count by category\n  const category = item.json.category;\n  categoryCount[category] = (categoryCount[category] || 0) + 1;\n  \n  // Count topics\n  const topics = item.json.key_topics ? item.json.key_topics.split(',') : [];\n  topics.forEach(topic => {\n    const cleanTopic = topic.trim();\n    if (cleanTopic) {\n      topicCount[cleanTopic] = (topicCount[cleanTopic] || 0) + 1;\n    }\n  });\n}\n\n// Find top 10 topics\nconst topTopics = Object.entries(topicCount)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 10)\n  .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {});\n\n// Calculate percentages\nconst sentimentPercentages = {\n  Positive: ((sentimentCount.Positive / totalArticles) * 100).toFixed(1) + '%',\n  Negative: ((sentimentCount.Negative / totalArticles) * 100).toFixed(1) + '%',\n  Neutral: ((sentimentCount.Neutral / totalArticles) * 100).toFixed(1) + '%'\n};\n\nconsole.log('\\n' + '='.repeat(50));\nconsole.log('📊 EXECUTION SUMMARY');\nconsole.log('='.repeat(50));\nconsole.log(`✅ Total Articles Processed: ${totalArticles}`);\nconsole.log('\\n📰 By Source:');\nObject.entries(sourceCount).forEach(([source, count]) => {\n  console.log(`   ${source}: ${count}`);\n});\nconsole.log('\\n🌐 By Language:');\nObject.entries(languageCount).forEach(([lang, count]) => {\n  console.log(`   ${lang}: ${count}`);\n});\nconsole.log('\\n😊 Sentiment Distribution:');\nObject.entries(sentimentCount).forEach(([sentiment, count]) => {\n  console.log(`   ${sentiment}: ${count} (${sentimentPercentages[sentiment]})`);\n});\nconsole.log('\\n🏷️ Top Topics:');\nObject.entries(topTopics).slice(0, 5).forEach(([topic, count]) => {\n  console.log(`   ${topic}: ${count}`);\n});\nconsole.log('='.repeat(50) + '\\n');\n\nreturn [{\n  json: {\n    summary: {\n      total_articles: totalArticles,\n      sources: sourceCount,\n      languages: languageCount,\n      sentiment_distribution: sentimentCount,\n      sentiment_percentages: sentimentPercentages,\n      categories: categoryCount,\n      top_topics: topTopics,\n      all_topics: topicCount,\n      processed_at: new Date().toISOString(),\n      status: 'Success'\n    }\n  }\n}];"        2100,
+
+      },        380
+
+      "type": "n8n-nodes-base.code",      ],
+
+      "typeVersion": 2,      "id": "save-to-sheets",
+
+      "position": [      "name": "Save to Google Sheets",
+
+        2520,      "credentials": {
+
+        460        "googleSheetsOAuth2Api": {
+
+      ],          "id": "Ja9l041N41e8rfxC",
+
+      "id": "generate-stats",          "name": "Google Sheets account"
+
+      "name": "Generate Statistics",        }
+
+      "notesInFlow": true,      },
+
+      "notes": "Creates comprehensive execution statistics"      "notesInFlow": true,
+
+    },      "notes": "Stores processed news articles with AI summaries"
+
+    {    },
+
+      "parameters": {    {
+
+        "content": "# 📰 Dynamic Multi-Source News Scraper\n## AI-Powered News Aggregation System\n\n### ✨ Key Features:\n- 🌐 **Dynamic Multi-Source** - Add unlimited news sources\n- 🤖 **AI Summarization** - GPT-4o Mini for intelligent summaries\n- 🌍 **Multilingual** - Bangla, English, and more\n- 📊 **Sentiment Analysis** - Positive/Negative/Neutral\n- 🏷️ **Topic Extraction** - Auto-categorization\n- 🔄 **Auto-Deduplication** - URL + similarity matching\n- 💾 **Google Sheets** - Organized storage with 18 columns\n- 📈 **Statistics** - Comprehensive execution reports\n\n### 📰 Default Sources (6):\n1. **Prothom Alo** (প্রথম আলো) - Bangla\n2. **Kaler Kantho** (কালের কণ্ঠ) - Bangla\n3. **The Daily Star** (English)\n4. **Jugantor** (যুগান্তর) - Bangla\n5. **Samakal** (সমকাল) - Bangla\n6. **Bangladesh Pratidin** (বাংলাদেশ প্রতিদিন) - Bangla\n\n### ⚙️ How to Add New Sources:\n1. Click \"Configure News Sources\" node\n2. Copy the template at the bottom\n3. Fill in: name, URL, selectors\n4. Set enabled: true\n5. Save and run!\n\n### 🔄 Automation:\n- Runs every 2 hours\n- ~10 articles per source\n- ~60 total articles per run\n- ~$0.06-0.12 per run (OpenAI)\n\n**Version:** 3.0 (Dynamic Multi-Source)",      "parameters": {
+
+        "height": 900,        "jsCode": "// Generate summary statistics\nconst allItems = $input.all();\nconst totalArticles = allItems.length;\n\n// Count by source\nconst sourceCount = {};\nconst sentimentCount = { Positive: 0, Negative: 0, Neutral: 0 };\nconst categoryCount = {};\n\nfor (const item of allItems) {\n  // Count sources\n  const source = item.json.source;\n  sourceCount[source] = (sourceCount[source] || 0) + 1;\n  \n  // Count sentiment\n  const sentiment = item.json.sentiment || 'Neutral';\n  sentimentCount[sentiment] = (sentimentCount[sentiment] || 0) + 1;\n  \n  // Count categories\n  const category = item.json.category;\n  categoryCount[category] = (categoryCount[category] || 0) + 1;\n}\n\nreturn [{\n  json: {\n    summary: {\n      total_articles: totalArticles,\n      sources: sourceCount,\n      sentiment_distribution: sentimentCount,\n      categories: categoryCount,\n      processed_at: new Date().toISOString(),\n      status: 'Success'\n    }\n  }\n}];"
+
+        "width": 480,      },
+
+        "color": 7      "type": "n8n-nodes-base.code",
+
+      },      "typeVersion": 2,
+
+      "type": "n8n-nodes-base.stickyNote",      "position": [
+
+      "typeVersion": 1,        2300,
+
+      "position": [        380
+
+        60,      ],
+
+        80      "id": "generate-summary",
+
+      ],      "name": "Generate Summary Stats",
+
+      "id": "workflow-overview",      "notesInFlow": true,
+
+      "name": "Workflow Overview"      "notes": "Creates summary statistics of processed articles"
+
+    },    },
+
+    {    {
+
+      "parameters": {      "parameters": {
+
+        "content": "## ⚙️ SOURCE CONFIGURATION\n\n**Edit \"Configure News Sources\" node to:**\n\n✅ Add new sources\n✅ Remove sources\n✅ Enable/disable sources\n✅ Adjust article limits\n✅ Customize selectors\n\n**Each source needs:**\n- Name (English + Bangla)\n- URL\n- Language\n- HTML Selectors\n- Max articles\n- Enabled flag\n\n**The workflow automatically:**\n- Fetches from all enabled sources\n- Parses with custom selectors\n- Merges all results\n- Removes duplicates\n- Processes with AI",        "content": "# 📰 Bangla News Scraper & AI Summarizer\n\n**Automated News Processing Pipeline**\n\n## Features:\n- 🌐 Scrapes from multiple Bangla news sources\n- 🤖 AI-powered summarization (Bangla + English)\n- 📊 Sentiment analysis\n- 🏷️ Topic extraction\n- 📈 Google Sheets integration\n- 🔄 Runs every 2 hours\n- ✨ Duplicate detection\n- ✅ Data validation\n\n## News Sources:\n1. **Prothom Alo** (প্রথম আলো)\n2. **Kaler Kantho** (কালের কণ্ঠ)\n\n## AI Processing:\n- Bangla summary (2-3 sentences)\n- English translation\n- Key topics identification\n- Sentiment analysis\n- Theme extraction\n\n## Output Format:\n- Google Sheets with 14 columns\n- Timestamped entries\n- Organized by date/time\n- Includes article links and images\n\n**Version:** 2.0 (AI-Enhanced)",
+
+        "height": 540,        "height": 683.8307760141093,
+
+        "width": 380,        "width": 442.31914893617025,
+
+        "color": 6        "color": 7
+
+      },      },
+
+      "type": "n8n-nodes-base.stickyNote",      "type": "n8n-nodes-base.stickyNote",
+
+      "typeVersion": 1,      "typeVersion": 1,
+
+      "position": [      "position": [
+
+        400,        -80,
+
+        80        140
+
+      ],      ],
+
+      "id": "config-info",      "id": "workflow-info",
+
+      "name": "Configuration Info"      "name": "Workflow Overview"
+
+    },    },
+
+    {    {
+
+      "parameters": {      "parameters": {
+
+        "content": "## 🔍 UNIVERSAL PARSER\n\n**Works with ANY news source!**\n\nThe parser automatically:\n1. Uses source-specific selectors\n2. Extracts all article fields\n3. Handles relative URLs\n4. Validates Bangla/English\n5. Falls back if needed\n6. Logs extraction details\n\n**Extracted Fields:**\n- Title (headline)\n- Link (full URL)\n- Description (excerpt)\n- Image (full URL)\n- Category (section)\n- Source metadata\n\n**Fallback Strategy:**\nIf primary selectors fail, scans all links for valid language content.",        "content": "## 🔍 Web Scraping Phase\n\nFetches HTML from Bangla news websites and extracts article data:\n\n- Title (শিরোনাম)\n- Link (লিংক)\n- Description (বিবরণ)\n- Image (ছবি)\n- Category (বিভাগ)\n- Source metadata\n\nUses **Cheerio** for HTML parsing with fallback selectors for reliability.",
+
+        "height": 540,        "height": 359.81278538812784,
+
+        "width": 380,        "width": 377.55319148936166,
+
+        "color": 6        "color": 6
+
+      },      },
+
+      "type": "n8n-nodes-base.stickyNote",      "type": "n8n-nodes-base.stickyNote",
+
+      "typeVersion": 1,      "typeVersion": 1,
+
+      "position": [      "position": [
+
+        840,        420,
+
+        80        140
+
+      ],      ],
+
+      "id": "parser-info",      "id": "scraping-info",
+
+      "name": "Parser Info"      "name": "Scraping Info"
+
+    },    },
+
+    {    {
+
+      "parameters": {      "parameters": {
+
+        "content": "## 🤖 AI PROCESSING\n\n**Multilingual Intelligence:**\n\n✅ Understands Bangla & English\n✅ Generates summaries in original language\n✅ Translates to English\n✅ Extracts key topics\n✅ Analyzes sentiment\n✅ Identifies themes\n\n**AI Agent Features:**\n- GPT-4o Mini model\n- Temperature: 0.4 (consistent)\n- Max tokens: 1200\n- Structured JSON output\n- Error handling\n\n**Output:**\n- Original summary (2-3 sentences)\n- English translation\n- 3-5 key topics (English)\n- Sentiment (Pos/Neg/Neutral)\n- Main theme",        "content": "## 🤖 AI Processing Phase\n\n**AI Agent Tasks:**\n1. Analyze Bangla content\n2. Generate Bangla summary\n3. Translate to English\n4. Extract key topics\n5. Determine sentiment\n6. Identify main theme\n\n**Model:** GPT-4o Mini\n- Supports Bangla Unicode\n- Low temperature (0.4) for consistency\n- Structured JSON output\n- Max 1000 tokens per summary",
+
+        "height": 540,        "height": 440,
+
+        "width": 380,        "width": 380,
+
+        "color": 6        "color": 6
+
+      },      },
+
+      "type": "n8n-nodes-base.stickyNote",      "type": "n8n-nodes-base.stickyNote",
+
+      "typeVersion": 1,      "typeVersion": 1,
+
+      "position": [      "position": [
+
+        1660,        1440,
+
+        80        140
+
+      ],      ],
+
+      "id": "ai-info",      "id": "ai-processing-info",
+
+      "name": "AI Processing Info"      "name": "AI Processing Info"
+
+    },    },
+
+    {    {
+
+      "parameters": {      "parameters": {
+
+        "content": "## 💾 DATA STORAGE\n\n**Google Sheets (18 Columns):**\n\n1. Date\n2. Time\n3. Weekday\n4. Source (English)\n5. Source (Bangla)\n6. Language\n7. Category\n8. Title\n9. Original Summary\n10. English Summary\n11. Key Topics\n12. Sentiment\n13. Main Theme\n14. Article Link\n15. Image URL\n16. Scraped At\n17. Processed At\n18. Processing Time\n\n**Benefits:**\n- Easy filtering by source\n- Language-based analysis\n- Sentiment tracking\n- Topic trends\n- Performance monitoring",        "content": "## 💾 Data Storage Phase\n\n**Google Sheets Columns:**\n1. Date\n2. Time\n3. Source\n4. Category\n5. Title (Bangla)\n6. Bangla Summary\n7. English Summary\n8. Key Topics\n9. Sentiment\n10. Main Theme\n11. Article Link\n12. Image URL\n13. Scraped At\n14. Processed At\n\nEnables easy filtering, analysis, and reporting.",
+
+        "height": 540,        "height": 440,
+
+        "width": 380,        "width": 380,
+
+        "color": 6        "color": 6
+
+      },      },
+
+      "type": "n8n-nodes-base.stickyNote",      "type": "n8n-nodes-base.stickyNote",
+
+      "typeVersion": 1,      "typeVersion": 1,
+
+      "position": [      "position": [
+
+        2260,        2040,
+
+        80        140
+
+      ],      ],
+
+      "id": "storage-info",      "id": "storage-info",
+
+      "name": "Storage Info"      "name": "Storage Info"
+
+    }    }
+
+  ],  ],
+
+  "pinData": {},  "pinData": {},
+
+  "connections": {  "connections": {
+
+    "Schedule Trigger": {    "Schedule Trigger": {
+
+      "main": [      "main": [
+
+        [        [
+
+          {          {
+
+            "node": "Configure News Sources",            "node": "Fetch Prothom Alo",
+
+            "type": "main",            "type": "main",
+
+            "index": 0            "index": 0
+
+          }          },
+
+        ]          {
+
+      ]            "node": "Fetch Kaler Kantho",
+
+    },            "type": "main",
+
+    "Configure News Sources": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Fetch HTML",    },
+
+            "type": "main",    "Fetch Prothom Alo": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Parse Prothom Alo Articles",
+
+    },            "type": "main",
+
+    "Fetch HTML": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Parse Articles (Universal)",    },
+
+            "type": "main",    "Fetch Kaler Kantho": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Parse Kaler Kantho Articles",
+
+    },            "type": "main",
+
+    "Parse Articles (Universal)": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Merge All Sources",    },
+
+            "type": "main",    "Parse Prothom Alo Articles": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Merge All Articles",
+
+    },            "type": "main",
+
+    "Merge All Sources": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Validate Articles",    },
+
+            "type": "main",    "Parse Kaler Kantho Articles": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Merge All Articles",
+
+    },            "type": "main",
+
+    "Validate Articles": {            "index": 1
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Remove Duplicates",    },
+
+            "type": "main",    "Merge All Articles": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Validate Articles",
+
+    },            "type": "main",
+
+    "Remove Duplicates": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "AI News Summarizer",    },
+
+            "type": "main",    "Validate Articles": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Remove Duplicates",
+
+    },            "type": "main",
+
+    "AI News Summarizer": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Format Final Data",    },
+
+            "type": "main",    "Remove Duplicates": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "AI News Summarizer",
+
+    },            "type": "main",
+
+    "OpenAI GPT-4o Mini": {            "index": 0
+
+      "ai_languageModel": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "AI News Summarizer",    },
+
+            "type": "ai_languageModel",    "AI News Summarizer": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Format Final Data",
+
+    },            "type": "main",
+
+    "Structured Output Parser": {            "index": 0
+
+      "ai_outputParser": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "AI News Summarizer",    },
+
+            "type": "ai_outputParser",    "OpenAI GPT-4o Mini": {
+
+            "index": 0      "ai_languageModel": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "AI News Summarizer",
+
+    },            "type": "ai_languageModel",
+
+    "Format Final Data": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Save to Google Sheets",    },
+
+            "type": "main",    "Structured Output Parser": {
+
+            "index": 0      "ai_outputParser": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "AI News Summarizer",
+
+    },            "type": "ai_outputParser",
+
+    "Save to Google Sheets": {            "index": 0
+
+      "main": [          }
+
+        [        ]
+
+          {      ]
+
+            "node": "Generate Statistics",    },
+
+            "type": "main",    "Format Final Data": {
+
+            "index": 0      "main": [
+
+          }        [
+
+        ]          {
+
+      ]            "node": "Save to Google Sheets",
+
+    }            "type": "main",
+
+  },            "index": 0
+
+  "active": false,          }
+
+  "settings": {        ]
+
+    "executionOrder": "v1",      ]
+
+    "saveManualExecutions": true,    },
+
+    "callerPolicy": "workflowsFromSameOwner",    "Save to Google Sheets": {
+
+    "executionTimeout": 900,      "main": [
+
+    "timezone": "Asia/Dhaka"        [
+
+  },          {
+
+  "versionId": "v3-dynamic-multi-source",            "node": "Generate Summary Stats",
+
+  "meta": {            "type": "main",
+
+    "templateCredsSetupCompleted": true,            "index": 0
+
+    "instanceId": "c4f1db98ecd74178a70f7f17c9b35261941324e33fdfcec8910ff8cb10d8482d"          }
+
+  },        ]
+
+  "id": "bangla-news-scraper-dynamic",      ]
+
+  "tags": [    }
+
+    {  },
+
+      "createdAt": "2025-10-04T00:00:00.000Z",  "active": false,
+
+      "updatedAt": "2025-10-04T00:00:00.000Z",  "settings": {
+
+      "id": "web-scraping",    "executionOrder": "v1",
+
+      "name": "Web Scraping"    "saveManualExecutions": true,
+
+    },    "callerPolicy": "workflowsFromSameOwner",
+
+    {    "executionTimeout": 600,
+
+      "createdAt": "2025-10-04T00:00:00.000Z",    "timezone": "Asia/Dhaka"
+
+      "updatedAt": "2025-10-04T00:00:00.000Z",  },
+
+      "id": "ai-summarization",  "versionId": "scraper-v2-ai-enhanced",
+
+      "name": "AI Summarization"  "meta": {
+
+    },    "templateCredsSetupCompleted": true,
+
+    {    "instanceId": "c4f1db98ecd74178a70f7f17c9b35261941324e33fdfcec8910ff8cb10d8482d"
+
+      "createdAt": "2025-10-04T00:00:00.000Z",  },
+
+      "updatedAt": "2025-10-04T00:00:00.000Z",  "id": "bangla-news-scraper",
+
+      "id": "news-automation",  "tags": [
+
+      "name": "News Automation"    {
+
+    },      "createdAt": "2025-10-02T00:00:00.000Z",
+
+    {      "updatedAt": "2025-10-02T00:00:00.000Z",
+
+      "createdAt": "2025-10-04T00:00:00.000Z",      "id": "web-scraping",
+
+      "updatedAt": "2025-10-04T00:00:00.000Z",      "name": "Web Scraping"
+
+      "id": "multilingual",    },
+
+      "name": "Multilingual"    {
+
+    },      "createdAt": "2025-10-02T00:00:00.000Z",
+
+    {      "updatedAt": "2025-10-02T00:00:00.000Z",
+
+      "createdAt": "2025-10-04T00:00:00.000Z",      "id": "ai-summarization",
+
+      "updatedAt": "2025-10-04T00:00:00.000Z",      "name": "AI Summarization"
+
+      "id": "dynamic-sources",    },
+
+      "name": "Dynamic Sources"    {
+
+    }      "createdAt": "2025-10-02T00:00:00.000Z",
+
+  ]      "updatedAt": "2025-10-02T00:00:00.000Z",
+
+}      "id": "news-automation",
+
       "name": "News Automation"
     },
     {
