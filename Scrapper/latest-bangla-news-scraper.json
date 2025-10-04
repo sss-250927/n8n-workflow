@@ -1085,7 +1085,8 @@
 
       "updatedAt": "2025-10-04T00:00:00.000Z",  },
 
-      "id": "ai-summarization",  "versionId": "scraper-v2-ai-enhanced",
+      "id": "ai-summarization",
+      "versionId": "scraper-v2-ai-enhanced",
 
       "name": "AI Summarization"  "meta": {
 
