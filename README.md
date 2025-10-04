@@ -100,14 +100,17 @@ This repository serves as a comprehensive collection of **n8n workflows** design
   - [📖 Documentation](docs/tribeca-dental-care-system.md)
 
 #### 📰 **Web Scraping & Data Collection**
-- **[Bangla News Scraper & AI Summarizer](Scrapper/latest-bangla-news-scraper.json)**
-  - Automated Bangla news scraping from multiple sources
-  - AI-powered summarization in both Bangla and English
-  - Sentiment analysis and topic extraction
-  - Duplicate detection with similarity matching
-  - Google Sheets integration for organized storage
-  - Scrapes Prothom Alo and Kaler Kantho every 2 hours
-  - Comprehensive data validation and error handling
+- **[Bangla News Scraper & AI Summarizer](Scrapper/latest-bangla-news-scraper.json)** ⭐ **v3.0 - Dynamic Multi-Source**
+  - ✨ **NEW:** Add unlimited news sources via simple configuration
+  - ✨ **NEW:** 6 default sources (Prothom Alo, Kaler Kantho, Daily Star, Jugantor, Samakal, Bangladesh Pratidin)
+  - ✨ **NEW:** Universal parser works with any news website
+  - 🤖 AI-powered summarization in both Bangla and English
+  - 📊 Sentiment analysis and topic extraction
+  - 🔍 Advanced duplicate detection (URL + title similarity)
+  - 💾 Google Sheets integration with 18-column structured storage
+  - ⚙️ Configuration-based architecture - no new nodes needed for sources
+  - 🔄 Automated scraping every 2 hours (~60 articles per run)
+  - 🌐 Multilingual support (Bangla, English, expandable)
   - [📖 Documentation](docs/bangla-news-scraper.md)
 
 ### Workflow Categories
