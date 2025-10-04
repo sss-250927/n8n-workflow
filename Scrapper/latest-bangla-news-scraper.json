@@ -32,12 +32,11 @@
 
       "position": [      "position": [
 
-        240,        240,
+        240,
+        460,
+        380
 
-        460        380
-
-      ],      ],
-
+      ],
       "id": "schedule-trigger",      "id": "schedule-trigger",
 
       "name": "Schedule Trigger",      "name": "Schedule Trigger",
